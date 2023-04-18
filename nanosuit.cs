@@ -28,6 +28,8 @@ namespace nanosuit
         public static ConfigEntry<int> nanochargdelay;
         public static ConfigEntry<int> nanovisioncost;
         public static ConfigEntry<bool> flycore;
+        public static ConfigEntry<bool> NanoSystemOnline;
+        public static ConfigEntry<bool> curemodeOnline;
         public static ConfigEntry<string> nanoup;
         public static ConfigEntry<string> language;
         public static ConfigEntry<KeyCode> ARMOR;
@@ -37,6 +39,7 @@ namespace nanosuit
         public static ConfigEntry<float> Xzhou;
         public static ConfigEntry<float> Yzhou;
         public static ConfigEntry<float> ArmorhudScale;
+        public static ConfigEntry<float> ArmorhudAlpha;
         public static string[] nanouplist = { "生存强化(Enhanced Survival)", "装甲强化(Enhanced Armor)", "隐身强化(Enhanced Stealth)", "充能强化(Enhanced Charge)", "推进器强化(Enhanced Propeller)", "纳米视野强化(Enhanced Nanovision)" };
         public static string[] languagelist = { "中文", "English"};
         public void Awake()
@@ -49,8 +52,8 @@ namespace nanosuit
                 new ConfigDescription("选择能量条HUD显示文字语言，重启游戏后生效(Select language of energy HUD.It takes effect after you restart the game)", new AcceptableValueList<string>(languagelist)));
             armorcost = Config.Bind<int>("装甲模式配置(Armor Settings)", "装甲消耗(Armor Cost)", 2, "装甲模式下能量自然消耗每秒的值(Natural energy cost per second in Armor mode)");
             armordefense = Config.Bind<int>("装甲模式配置(Armor Settings)", "装甲防御力(Armor Defense)", 45, "装甲模式下受击，子弹穿透力超过这个数值则会对能量造成5点消耗，反之造成1点能量消耗(When hit in Armor mode, bullet penetration above this value costs 5 energy and vice versa costs 1 energy)");
-
             ArmorhudScale = Config.Bind("装甲模式配置(Armor Settings)", "HUD缩放(HUD Scale)", 1f, new ConfigDescription("装甲模式下的HUD缩放(The HUD Scale in Armor mode)", new AcceptableValueRange<float>(0.8f, 3f)));
+            ArmorhudAlpha = Config.Bind("装甲模式配置(Armor Settings)", "HUD透明度(HUD Alpha)", 0.3f, new ConfigDescription("装甲模式下的HUD透明度(The HUD Alpha in Armor mode)", new AcceptableValueRange<float>(0f, 0.5f)));
             stealthcost = Config.Bind<int>("隐身模式配置(Stealth Settings)", "隐身消耗(Stealth Cost)", 5, "隐身模式下能量自然消耗每秒的值(Natural energy cost per second in Stealth mode)");
             nanocharg = Config.Bind<int>("充能配置(Charge Settings)", "充能速率(Charging Speed)", 25, "纳米服每秒充能速率(Nanosuit charge rate per second)");
             nanochargdelay = Config.Bind<int>("充能配置(Charge Settings)", "充能延迟(Charging Delay)", 2, "纳米服关闭功能后延迟几秒后开始充能(Turn off the function after a delay of a few seconds to start charging)");
@@ -64,7 +67,9 @@ namespace nanosuit
             flycore = Config.Bind<bool>("垂直推进器设置(Propeller Settings)", "是否启动垂直喷射器(Whether to start the Propeller)", false, "启动后跳跃时长按空格可消耗能量垂直起飞(After starting the jump, press space for a long time to consume energy for vertical takeoff)");
             flycost = Config.Bind<int>("垂直推进器设置(Propeller Settings)", "推进器消耗(Propeller Cost)", 15, "飞行时每秒能量消耗值(Natural energy cost per second in Propeller mode)");
             nanovisioncost = Config.Bind<int>("纳米视野设置(Nanovision Settings)", "纳米视野消耗(Nanovision Cost)", 8, "纳米视野开启后每秒能量消耗值(Natural energy cost per second in Nanovision mode)");
-            nanovolume = Config.Bind("纳米系统音量设置(Nanosystem volume Settings)", "设置音量(Volume Settings)", 1f, new ConfigDescription("纳米服各个模式启动时的音效音量(The sound volume of each mode on the Nano Suit)", new AcceptableValueRange<float>(0f, 1f)));
+            nanovolume = Config.Bind("纳米系统设置(Nanosystem Settings)", "设置音量(Volume Settings)", 1f, new ConfigDescription("纳米服各个模式启动时的音效音量(The sound volume of each mode on the Nano Suit)", new AcceptableValueRange<float>(0f, 1f)));
+            NanoSystemOnline = Config.Bind<bool>("纳米系统设置(Nanosystem Settings)", "纳米系统是否启动(NanoSystem online or not)", true, "纳米机器，小子！启动纳米系统(Nanomachine,son!Start-up NanoSystem)");
+            curemodeOnline = Config.Bind<bool>("纳米系统设置(Nanosystem Settings)", "自动修复系统是否启动(Automatic treatment system online or not)", true, "你为什么还不死？受伤10秒后修复全部黑色部位，去除所有负面效果，缓慢回复所有生命值(Why don't you die?Remove all negative states, repair black areas, and restore all health after 10 seconds of damage)");
         }
         void Update()
         {
@@ -135,8 +140,11 @@ namespace nanosuit
         private GameObject flymode;
         private GameObject marktarget;
         private GameObject[] AItarget;
-        float energytimer = 0;
-        float timer = 0;
+        private float energytimer = 0;
+        private float timer = 0;
+        private float MAXHP = 0;
+        private float NOWHP = 0;
+        public static float fixdelaytime = 0;      
         bool isshengcun = false;
         bool ischarging = false;
         bool isenergyempty = false;
@@ -146,9 +154,11 @@ namespace nanosuit
         public static bool isnanovision = false;
         public static bool isarmorhit = false;
         public static bool isarmorhitdanger = false;
+        public static bool startfixdebuff = false;
+        public static bool iscureyourself = false;
         bool isplayaudio = false;
         bool isclick = false;
-        bool isfly = false;
+        bool isfly = false;    
         private bool[] AIhealth;
         public enum Clickcount
         {
@@ -208,306 +218,538 @@ namespace nanosuit
 
         // Update is called once per frame
         void Update()
-        {
-            this.GetComponent<AudioSource>().volume= nanosuitcore.nanovolume.Value;//纳米系统音量调整
-            gameWorld = Singleton<GameWorld>.Instance;
-            if (nanosuitcore.nanoup.Value == "生存强化(Enhanced Survival)" && isshengcun!=true)
+        {           
+            if (nanosuitcore.NanoSystemOnline.Value)
             {
-                new NanosuitPatch().Enable();//启动受击buff     
-                isshengcun = true;
-                
-            }
-            if (nanosuitcore.nanoup.Value != "生存强化(Enhanced Survival)" && isshengcun == true)
-            {
-                new NanosuitPatch().Disable();//关闭受击buff     
-                isshengcun = false;
-            }
-            if (nanosuitcore.nanoup.Value != "装甲强化(Enhanced Armor)")
-            {
-                armorbasecost = nanosuitcore.armorcost.Value;
-                armorpowerbase = nanosuitcore.armordefense.Value;
-            }
-            else
-            {
-                nanosuitcore.armorcost.Value = 1;
-                nanosuitcore.armordefense.Value = 90;
-                nanosuitcore.stealthcost.Value = 5;
-                nanosuitcore.nanocharg.Value = 25;
-                nanosuitcore.nanochargdelay.Value = 2;
-                nanosuitcore.flycost.Value = 15;
-                nanosuitcore.nanovisioncost.Value = 8;
-                armorbasecost = 1;
-                armorpowerbase = 90;
-                isshengcun = false;
-                //if (nanoarmorhud != null)
-                //{
-                //MeshRenderer[] armorupMeshRenderer = nanoarmorhud.GetComponentsInChildren<MeshRenderer>();
-                //foreach (MeshRenderer child in armorupMeshRenderer)
-                //{
-                //armorupMeshRenderer[0].materials[0].SetColor("_Edgecolor", armorupcolor);
-                //}
-                //}
-            }
-            if (nanosuitcore.nanoup.Value != "隐身强化(Enhanced Stealth)")
-            {
-                stealthbasecost = nanosuitcore.stealthcost.Value;
-            }
-            else
-            {
-                nanosuitcore.stealthcost.Value = 3;
-                nanosuitcore.armorcost.Value = 2;
-                nanosuitcore.armordefense.Value = 45;
-                nanosuitcore.nanocharg.Value = 25;
-                nanosuitcore.nanochargdelay.Value = 2;
-                nanosuitcore.flycost.Value = 15;
-                nanosuitcore.nanovisioncost.Value = 8;
-                stealthbasecost = 3;
-                isshengcun = false;
-            }
-            if (nanosuitcore.nanoup.Value != "充能强化(Enhanced Charge)")
-            {
-                nanochargbase = nanosuitcore.nanocharg.Value;
-                nanodelaychargbase = nanosuitcore.nanochargdelay.Value;
-            }
-            else
-            {
-                nanosuitcore.nanocharg.Value = 50;
-                nanosuitcore.nanochargdelay.Value = 1;
-                nanosuitcore.armorcost.Value = 2;
-                nanosuitcore.armordefense.Value = 45;
-                nanosuitcore.stealthcost.Value = 5;
-                nanosuitcore.flycost.Value = 15;
-                nanosuitcore.nanovisioncost.Value = 8;
-                nanodelaychargbase = 1;
-                nanochargbase = 50;
-                isshengcun = false;
-            }
-            if (nanosuitcore.nanoup.Value != "推进器强化(Enhanced Propeller)")
-            {
-                flybasecost = nanosuitcore.flycost.Value;
-            }
-            else
-            {
-                nanosuitcore.nanocharg.Value = 25;
-                nanosuitcore.nanochargdelay.Value = 2;
-                nanosuitcore.armorcost.Value = 2;
-                nanosuitcore.armordefense.Value = 45;
-                nanosuitcore.stealthcost.Value = 5;
-                nanosuitcore.flycost.Value = 5;
-                nanosuitcore.nanovisioncost.Value = 8;
-                flybasecost = 5;
-                isshengcun = false;
-            }
-            if (nanosuitcore.nanoup.Value != "纳米视野强化(Enhanced Nanovision)")
-            {
-                nanovisionbasecost = nanosuitcore.nanovisioncost.Value;
-            }
-            else
-            {
-                nanosuitcore.nanocharg.Value = 25;
-                nanosuitcore.nanochargdelay.Value = 2;
-                nanosuitcore.armorcost.Value = 2;
-                nanosuitcore.armordefense.Value = 45;
-                nanosuitcore.stealthcost.Value = 5;
-                nanosuitcore.flycost.Value = 15;
-                nanosuitcore.nanovisioncost.Value = 2;
-                nanovisionbasecost = 2;
-                isshengcun = false;
-            }
-            if (marktarget == null)
-            {
-                marktarget = GameObject.Find("FPS Camera");//找到第一人称视角摄像机
-            }
-            if (nanoenergyhud == null && nanosuitcore.language.Value == "中文")//生成能量条HUD
-            {
-                var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
-                nanoenergyhud = nanoenergyhudbase as GameObject;
-                nanoenergyhud.transform.parent = marktarget.transform;              
-            }
-            if (nanoenergyhud == null && nanosuitcore.language.Value == "English")//生成能量条HUD
-            {
-                var nanoenergyhudbase = Instantiate(enenergyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
-                nanoenergyhud = nanoenergyhudbase as GameObject;
-                nanoenergyhud.transform.parent = marktarget.transform;
-            }
-            if (nanoenergyhud != null)//能量条HUD变化，模式显示，低能量警告
-            {
-                nanoenergyhud.transform.localPosition = new Vector3(nanosuitcore.Xzhou.Value, nanosuitcore.Yzhou.Value, 0);
-                Transform[] allChildrenTransform = nanoenergyhud.GetComponentsInChildren<Transform>();
-                foreach (Transform child in allChildrenTransform)
+                this.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;//纳米系统音量调整
+                gameWorld = Singleton<GameWorld>.Instance;
+                if (nanosuitcore.nanoup.Value == "生存强化(Enhanced Survival)")
                 {
-                    allChildrenTransform[1].localScale = new Vector3(maxenergy, 1, 1);
-                }
-                MeshRenderer[] allChildrenMeshRenderer = nanoenergyhud.GetComponentsInChildren<MeshRenderer>();
-                foreach (MeshRenderer child in allChildrenMeshRenderer)
-                {
-                    if (nanosuitcore.nanoup.Value == "充能强化(Enhanced Charge)")
+                    if (startfixdebuff && Entermap()&& nanosuitcore.curemodeOnline.Value)
                     {
-                        allChildrenMeshRenderer[0].materials[0].SetColor("_Edgecolor", chargupcolor);
+                        fixdelaytime += Time.deltaTime;
+                        var HeadHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.Head, true);
+                        var ChestHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.Chest, true);
+                        var LeftArmHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.LeftArm, true);
+                        var LeftLegHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.LeftLeg, true);
+                        var RightArmHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.RightArm, true);
+                        var RightLegHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.RightLeg, true);
+                        var StomachHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.Stomach, true);
+                        if (fixdelaytime >= 10 && !iscureyourself)
+                        {
+                            gameWorld.AllPlayers[0].ActiveHealthController.RemoveNegativeEffects(EBodyPart.Common);
+                            gameWorld.AllPlayers[0].ActiveHealthController.RestoreBodyPart(EBodyPart.LeftArm, 1f);
+                            gameWorld.AllPlayers[0].ActiveHealthController.RestoreBodyPart(EBodyPart.LeftLeg, 1f);
+                            gameWorld.AllPlayers[0].ActiveHealthController.RestoreBodyPart(EBodyPart.RightArm, 1f);
+                            gameWorld.AllPlayers[0].ActiveHealthController.RestoreBodyPart(EBodyPart.RightLeg, 1f);
+                            gameWorld.AllPlayers[0].ActiveHealthController.RestoreBodyPart(EBodyPart.Stomach, 1f);
+                            //gameWorld.AllPlayers[0].ActiveHealthController.RestoreFullHealth();                       
+                            iscureyourself = true;
+                            fixdelaytime = 0;
+                            Console.WriteLine("启动修复");
+                        }
+                        if (iscureyourself)
+                        {
+                            var nowHPHead = HeadHP.Current;
+                            var nowHPChest = ChestHP.Current;
+                            var nowHPLeftArm = LeftArmHP.Current;
+                            var nowHPLeftLeg = LeftLegHP.Current;
+                            var nowHPRightArm = RightArmHP.Current;
+                            var nowHPRightLeg = RightLegHP.Current;
+                            var nowHPStomach = StomachHP.Current;
+                            if (nowHPHead < HeadHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Head, 0.1f, default);
+                                nowHPHead += 0.1f;
+                            }
+                            if (nowHPChest < ChestHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Chest, 0.1f, default);
+                                nowHPChest += 0.1f;
+                            }
+                            if (nowHPLeftArm < LeftArmHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.LeftArm, 0.1f, default);
+                                nowHPLeftArm += 0.1f;
+                            }
+                            if (nowHPLeftLeg < LeftLegHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.LeftLeg, 0.1f, default);
+                                nowHPLeftLeg += 0.1f;
+                            }
+                            if (nowHPRightArm < RightArmHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.RightArm, 0.1f, default);
+                                nowHPRightArm += 0.1f;
+                            }
+                            if (nowHPRightLeg < RightLegHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.RightLeg, 0.1f, default);
+                                nowHPRightLeg += 0.1f;
+                            }
+                            if (nowHPStomach < StomachHP.Maximum)
+                            {
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Stomach, 0.1f, default);
+                                nowHPStomach += 0.1f;
+                            }
+                            NOWHP = nowHPStomach + nowHPRightLeg + nowHPRightArm + nowHPLeftLeg + nowHPLeftArm + nowHPChest + nowHPHead;
+                            MAXHP = HeadHP.Maximum + ChestHP.Maximum + LeftArmHP.Maximum + LeftLegHP.Maximum + RightArmHP.Maximum + RightLegHP.Maximum + StomachHP.Maximum;
+                            if (MAXHP <= NOWHP)
+                            {
+                                iscureyourself = false;
+                                startfixdebuff = false;
+                            }
+                        }
                     }
-                    else
+                    if (!isshengcun)
                     {
-                        allChildrenMeshRenderer[0].materials[0].SetColor("_Edgecolor", chargupbasecolor);
-                    }
-                    if (maxenergy <= 20)
-                    {
-                        allChildrenMeshRenderer[5].enabled = true;
-                    }
-                    else
-                    {
-                        allChildrenMeshRenderer[5].enabled = false;
-                    }
-                    if (isfly)
-                    {
-                        allChildrenMeshRenderer[6].enabled = true;
-                    }
-                    else
-                    {
-                        allChildrenMeshRenderer[6].enabled = false;
-                    }
-                    if (isnanovision)
-                    {
-                        allChildrenMeshRenderer[7].enabled = true;
-                    }
-                    else
-                    {
-                        allChildrenMeshRenderer[7].enabled = false;
-                    }
-                    if (isarmor)
-                    {
-                        allChildrenMeshRenderer[2].enabled = false;
-                        allChildrenMeshRenderer[3].enabled = true;
-                        allChildrenMeshRenderer[4].enabled = false;
-                    }
-                    if (isstealth)
-                    {
-                        allChildrenMeshRenderer[2].enabled = false;
-                        allChildrenMeshRenderer[3].enabled = false;
-                        allChildrenMeshRenderer[4].enabled = true;
-                    }
-                    if (isstealth!=true && isarmor != true)
-                    {
-                        allChildrenMeshRenderer[2].enabled = true;
-                        allChildrenMeshRenderer[3].enabled = false;
-                        allChildrenMeshRenderer[4].enabled = false;
+                        new NanosuitPatch().Enable();//启动受击buff
+                        new NanoSystemPatch().Enable();
+                        isshengcun = true;
                     }
                 }
-            }
-            if (ischarging)//开始充能
-            {
-                if (isenergy == false)
+                if (nanosuitcore.nanoup.Value != "生存强化(Enhanced Survival)" && isshengcun == true)
                 {
-                    energytimer += Time.deltaTime;             
-                    if (energytimer >= nanodelaychargbase)
-                    {
-                    energytimer = 0;
-                    isenergy = true;
-                    }
+                    new NanosuitPatch().Disable();//关闭受击buff     
+                    isshengcun = false;
                 }
-                if (isenergy)
+                if (nanosuitcore.nanoup.Value != "装甲强化(Enhanced Armor)")
                 {
-                    maxenergy += Time.deltaTime * nanochargbase;
-                    isplayaudio = false;
-                    if (maxenergy >= 100)
-                    {
-                        maxenergy = 100;
-                        ischarging = false;
-                        isenergy = false;
-                    }
-                }
-            }
-            if (Input.GetKeyDown(nanosuitcore.ARMOR.Value) && maxenergy > 0)//装甲模式启动音效和关闭音效
-            {
-                this.GetComponent<AudioSource>().clip = audios[armorvoice];
-                this.GetComponent<AudioSource>().Play();
-                newmaterial[0] = armormaterial;
-                newmaterial[1] = armormaterial02;
-                Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
-                armorvoice++;
-                stealthvoice = 2;                  
-                if (armorvoice >= 2)//装甲模式是否关闭
-                {
-                    armorvoice = 0;
-                    if (nanoarmarmor != null)
-                    {
-                        Destroy(nanoarmarmor);
-                    }
-                    if (nanoarmor != null)
-                    {
-                        Destroy(nanoarmor);
-                    }
-                    if (armorhudani != null)
-                    {
-                        armorhudani[armorhudani.clip.name].time = armorhudani[armorhudani.clip.name].length;
-                        armorhudani[armorhudani.clip.name].speed = -1;
-                        armorhudani.Play(armorhudani.clip.name);                      
-                    }
-                    newmaterial[0] = basematerial;
-                    newmaterial[1] = basematerial02;
-                    Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
-                    isstealth = false;
-                    isarmor = false;
-                    ischarging = true;
-                    isenergy = false;
-                    energytimer = 0;
-                }
-                nanomode = armorvoice;
-            }
-            if (Input.GetKeyDown(nanosuitcore.STEALTH.Value) && maxenergy > 0)//隐身模式启动音效和关闭音效
-            {
-                this.GetComponent<AudioSource>().clip = audios[stealthvoice];
-                this.GetComponent<AudioSource>().Play();
-                newmaterial[0] = stealthmaterial;
-                newmaterial[1] = stealthmaterial;
-                Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
-                StartCoroutine("CloakCharacter");
-                stealthvoice++;
-                armorvoice = 0;
-                if (stealthvoice >= 4)//隐身模式是否关闭
-                {
-                    stealthvoice = 2;
-                    if (nanoarmarmor != null)
-                    {
-                        Destroy(nanoarmarmor);
-                    }
-                    if (nanoarmor != null)
-                    {
-                        Destroy(nanoarmor);
-                    }
-                    StartCoroutine("DeCloakCharacter");
-                    ischarging = true;
-                    isstealth = false;
-                    isarmor = false;
-                    isenergy = false;
-                    energytimer = 0;
-                }
-                nanomode = stealthvoice;
-            }           
-            if (Input.GetKeyDown(nanosuitcore.NANOVISION.Value) && maxenergy > 0)//纳米视野是否启动
-            {
-                isnanovision = !isnanovision;
-                if (isnanovision)//判断现在是否纳米视野
-                {
-                    this.GetComponent<AudioSource>().clip = audios[4];
-                    this.GetComponent<AudioSource>().Play();                    
-                    if (nanovisionhud == null)
-                    {
-                        var nanovisionhudbase = Instantiate(nanovisionhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
-                        nanovisionhud = nanovisionhudbase as GameObject;
-                        nanovisionhud.transform.parent = marktarget.transform;
-                    }
-                    if (Entermap() && gameWorld.AllPlayers.Count>=2)
-                    {
-                        for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
-                        {                            
-                            Console.WriteLine("读取坐标" + gameWorld.AllPlayers[i].Transform.position);
-                            Console.WriteLine(i);
-                            AItarget[i] = Instantiate(nanotargetPrefab, gameWorld.AllPlayers[i].Transform.position, gameWorld.AllPlayers[i].Transform.rotation) as GameObject;
-                        }                       
-                    }
+                    armorbasecost = nanosuitcore.armorcost.Value;
+                    armorpowerbase = nanosuitcore.armordefense.Value;
                 }
                 else
                 {
+                    nanosuitcore.armorcost.Value = 1;
+                    nanosuitcore.armordefense.Value = 90;
+                    nanosuitcore.stealthcost.Value = 5;
+                    nanosuitcore.nanocharg.Value = 25;
+                    nanosuitcore.nanochargdelay.Value = 2;
+                    nanosuitcore.flycost.Value = 15;
+                    nanosuitcore.nanovisioncost.Value = 8;
+                    armorbasecost = 1;
+                    armorpowerbase = 90;
+                    isshengcun = false;
+                    //if (nanoarmorhud != null)
+                    //{
+                    //MeshRenderer[] armorupMeshRenderer = nanoarmorhud.GetComponentsInChildren<MeshRenderer>();
+                    //foreach (MeshRenderer child in armorupMeshRenderer)
+                    //{
+                    //armorupMeshRenderer[0].materials[0].SetColor("_Edgecolor", armorupcolor);
+                    //}
+                    //}
+                }
+                if (nanosuitcore.nanoup.Value != "隐身强化(Enhanced Stealth)")
+                {
+                    stealthbasecost = nanosuitcore.stealthcost.Value;
+                }
+                else
+                {
+                    nanosuitcore.stealthcost.Value = 3;
+                    nanosuitcore.armorcost.Value = 2;
+                    nanosuitcore.armordefense.Value = 45;
+                    nanosuitcore.nanocharg.Value = 25;
+                    nanosuitcore.nanochargdelay.Value = 2;
+                    nanosuitcore.flycost.Value = 15;
+                    nanosuitcore.nanovisioncost.Value = 8;
+                    stealthbasecost = 3;
+                    isshengcun = false;
+                }
+                if (nanosuitcore.nanoup.Value != "充能强化(Enhanced Charge)")
+                {
+                    nanochargbase = nanosuitcore.nanocharg.Value;
+                    nanodelaychargbase = nanosuitcore.nanochargdelay.Value;
+                }
+                else
+                {
+                    nanosuitcore.nanocharg.Value = 50;
+                    nanosuitcore.nanochargdelay.Value = 1;
+                    nanosuitcore.armorcost.Value = 2;
+                    nanosuitcore.armordefense.Value = 45;
+                    nanosuitcore.stealthcost.Value = 5;
+                    nanosuitcore.flycost.Value = 15;
+                    nanosuitcore.nanovisioncost.Value = 8;
+                    nanodelaychargbase = 1;
+                    nanochargbase = 50;
+                    isshengcun = false;
+                }
+                if (nanosuitcore.nanoup.Value != "推进器强化(Enhanced Propeller)")
+                {
+                    flybasecost = nanosuitcore.flycost.Value;
+                }
+                else
+                {
+                    nanosuitcore.nanocharg.Value = 25;
+                    nanosuitcore.nanochargdelay.Value = 2;
+                    nanosuitcore.armorcost.Value = 2;
+                    nanosuitcore.armordefense.Value = 45;
+                    nanosuitcore.stealthcost.Value = 5;
+                    nanosuitcore.flycost.Value = 5;
+                    nanosuitcore.nanovisioncost.Value = 8;
+                    flybasecost = 5;
+                    isshengcun = false;
+                }
+                if (nanosuitcore.nanoup.Value != "纳米视野强化(Enhanced Nanovision)")
+                {
+                    nanovisionbasecost = nanosuitcore.nanovisioncost.Value;
+                }
+                else
+                {
+                    nanosuitcore.nanocharg.Value = 25;
+                    nanosuitcore.nanochargdelay.Value = 2;
+                    nanosuitcore.armorcost.Value = 2;
+                    nanosuitcore.armordefense.Value = 45;
+                    nanosuitcore.stealthcost.Value = 5;
+                    nanosuitcore.flycost.Value = 15;
+                    nanosuitcore.nanovisioncost.Value = 2;
+                    nanovisionbasecost = 2;
+                    isshengcun = false;
+                }
+                if (marktarget == null)
+                {
+                    marktarget = GameObject.Find("FPS Camera");//找到第一人称视角摄像机
+                }
+                if (nanoenergyhud == null && nanosuitcore.language.Value == "中文")//生成能量条HUD
+                {
+                    var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                    nanoenergyhud = nanoenergyhudbase as GameObject;
+                    nanoenergyhud.transform.parent = marktarget.transform;
+                }
+                if (nanoenergyhud == null && nanosuitcore.language.Value == "English")//生成能量条HUD
+                {
+                    var nanoenergyhudbase = Instantiate(enenergyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                    nanoenergyhud = nanoenergyhudbase as GameObject;
+                    nanoenergyhud.transform.parent = marktarget.transform;
+                }
+                if (nanoenergyhud != null)//能量条HUD变化，模式显示，低能量警告
+                {
+                    nanoenergyhud.transform.localPosition = new Vector3(nanosuitcore.Xzhou.Value, nanosuitcore.Yzhou.Value, 0);
+                    Transform[] allChildrenTransform = nanoenergyhud.GetComponentsInChildren<Transform>();
+                    foreach (Transform child in allChildrenTransform)
+                    {
+                        allChildrenTransform[1].localScale = new Vector3(maxenergy, 1, 1);
+                    }
+                    MeshRenderer[] allChildrenMeshRenderer = nanoenergyhud.GetComponentsInChildren<MeshRenderer>();
+                    foreach (MeshRenderer child in allChildrenMeshRenderer)
+                    {
+                        if (nanosuitcore.nanoup.Value == "充能强化(Enhanced Charge)")
+                        {
+                            allChildrenMeshRenderer[0].materials[0].SetColor("_Edgecolor", chargupcolor);
+                        }
+                        else
+                        {
+                            allChildrenMeshRenderer[0].materials[0].SetColor("_Edgecolor", chargupbasecolor);
+                        }
+                        if (maxenergy <= 20)
+                        {
+                            allChildrenMeshRenderer[5].enabled = true;
+                        }
+                        else
+                        {
+                            allChildrenMeshRenderer[5].enabled = false;
+                        }
+                        if (isfly)
+                        {
+                            allChildrenMeshRenderer[6].enabled = true;
+                        }
+                        else
+                        {
+                            allChildrenMeshRenderer[6].enabled = false;
+                        }
+                        if (isnanovision)
+                        {
+                            allChildrenMeshRenderer[7].enabled = true;
+                        }
+                        else
+                        {
+                            allChildrenMeshRenderer[7].enabled = false;
+                        }
+                        if (isarmor)
+                        {
+                            allChildrenMeshRenderer[2].enabled = false;
+                            allChildrenMeshRenderer[3].enabled = true;
+                            allChildrenMeshRenderer[4].enabled = false;
+                        }
+                        if (isstealth)
+                        {
+                            allChildrenMeshRenderer[2].enabled = false;
+                            allChildrenMeshRenderer[3].enabled = false;
+                            allChildrenMeshRenderer[4].enabled = true;
+                        }
+                        if (isstealth != true && isarmor != true)
+                        {
+                            allChildrenMeshRenderer[2].enabled = true;
+                            allChildrenMeshRenderer[3].enabled = false;
+                            allChildrenMeshRenderer[4].enabled = false;
+                        }
+                    }
+                }
+                if (ischarging)//开始充能
+                {
+                    if (isenergy == false)
+                    {
+                        energytimer += Time.deltaTime;
+                        if (energytimer >= nanodelaychargbase)
+                        {
+                            energytimer = 0;
+                            isenergy = true;
+                        }
+                    }
+                    if (isenergy)
+                    {
+                        maxenergy += Time.deltaTime * nanochargbase;
+                        isplayaudio = false;
+                        if (maxenergy >= 100)
+                        {
+                            maxenergy = 100;
+                            ischarging = false;
+                            isenergy = false;
+                        }
+                    }
+                }
+                if (Input.GetKeyDown(nanosuitcore.ARMOR.Value) && maxenergy > 0)//装甲模式启动音效和关闭音效
+                {
+                    this.GetComponent<AudioSource>().clip = audios[armorvoice];
+                    this.GetComponent<AudioSource>().Play();
+                    newmaterial[0] = armormaterial;
+                    newmaterial[1] = armormaterial02;
+                    Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
+                    armorvoice++;
+                    stealthvoice = 2;
+                    if (armorvoice >= 2)//装甲模式是否关闭
+                    {
+                        armorvoice = 0;
+                        if (nanoarmarmor != null)
+                        {
+                            Destroy(nanoarmarmor);
+                        }
+                        if (nanoarmor != null)
+                        {
+                            Destroy(nanoarmor);
+                        }
+                        if (armorhudani != null)
+                        {
+                            armorhudani[armorhudani.clip.name].time = armorhudani[armorhudani.clip.name].length;
+                            armorhudani[armorhudani.clip.name].speed = -1;
+                            armorhudani.Play(armorhudani.clip.name);
+                        }
+                        newmaterial[0] = basematerial;
+                        newmaterial[1] = basematerial02;
+                        Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
+                        if (gameWorld.AllPlayers[0].ActiveHealthController.DamageCoeff != 1f && Entermap())
+                        {
+                            gameWorld.AllPlayers[0].ActiveHealthController.SetDamageCoeff(1f);
+                        }
+                        isstealth = false;
+                        isarmor = false;
+                        ischarging = true;
+                        isenergy = false;
+                        energytimer = 0;
+                    }
+                    nanomode = armorvoice;
+                }
+                if (Input.GetKeyDown(nanosuitcore.STEALTH.Value) && maxenergy > 0)//隐身模式启动音效和关闭音效
+                {
+                    this.GetComponent<AudioSource>().clip = audios[stealthvoice];
+                    this.GetComponent<AudioSource>().Play();
+                    newmaterial[0] = stealthmaterial;
+                    newmaterial[1] = stealthmaterial;
+                    Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
+                    StartCoroutine("CloakCharacter");
+                    stealthvoice++;
+                    armorvoice = 0;
+                    if (stealthvoice >= 4)//隐身模式是否关闭
+                    {
+                        stealthvoice = 2;
+                        if (nanoarmarmor != null)
+                        {
+                            Destroy(nanoarmarmor);
+                        }
+                        if (nanoarmor != null)
+                        {
+                            Destroy(nanoarmor);
+                        }
+                        StartCoroutine("DeCloakCharacter");
+                        ischarging = true;
+                        isstealth = false;
+                        isarmor = false;
+                        isenergy = false;
+                        energytimer = 0;
+                    }
+                    nanomode = stealthvoice;
+                }
+                if (Input.GetKeyDown(nanosuitcore.NANOVISION.Value) && maxenergy > 0)//纳米视野是否启动
+                {
+                    isnanovision = !isnanovision;
+                    if (isnanovision)//判断现在是否纳米视野
+                    {
+                        this.GetComponent<AudioSource>().clip = audios[4];
+                        this.GetComponent<AudioSource>().Play();
+                        if (nanovisionhud == null)
+                        {
+                            var nanovisionhudbase = Instantiate(nanovisionhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                            nanovisionhud = nanovisionhudbase as GameObject;
+                            nanovisionhud.transform.parent = marktarget.transform;
+                        }
+                        if (Entermap() && gameWorld.AllPlayers.Count >= 2)
+                        {
+                            for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
+                            {
+                                Console.WriteLine("读取坐标" + gameWorld.AllPlayers[i].Transform.position);
+                                Console.WriteLine(i);
+                                AItarget[i] = Instantiate(nanotargetPrefab, gameWorld.AllPlayers[i].Transform.position, gameWorld.AllPlayers[i].Transform.rotation) as GameObject;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (nanovisionhud != null)
+                        {
+                            Destroy(nanovisionhud);
+                        }
+                        if (AItarget != null)
+                        {
+                            for (int i = 1; i < 100; i++)//获取全部AI
+                            {
+                                Destroy(AItarget[i]);
+                            }
+                        }
+                        if (!isstealth || !isarmor || !isfly)
+                        {
+                            ischarging = true;
+                            energytimer = 0;
+                        }
+                    }
+                }
+                if (nanomode == 1 && !isenergyempty)//判断现在是否启动装甲模式
+                {
+                    if (nanoarmor != null)
+                    {
+                        Destroy(nanoarmor);
+                    }
+                    var nanoarmorbase = Instantiate(armorPrefab, this.transform.position, this.transform.rotation);
+                    nanoarmor = nanoarmorbase as GameObject;
+                    nanoarmor.transform.parent = this.transform;
+                    var nanoarmarmorbase = Instantiate(armarmorPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                    nanoarmarmor = nanoarmarmorbase as GameObject;
+                    nanoarmarmor.transform.parent = marktarget.transform;
+                    if (nanoarmorhud == null)
+                    {
+                        var nanoarmorhudbase = Instantiate(armorhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                        nanoarmorhud = nanoarmorhudbase as GameObject;
+                        armorhudani = nanoarmorhud.GetComponent<Animation>();
+                        nanoarmorhud.transform.parent = marktarget.transform;
+                    }
+                    if (armorhudani != null)
+                    {
+                        armorhudani[armorhudani.clip.name].time = 0;
+                        armorhudani[armorhudani.clip.name].speed = 1;
+                        armorhudani.Play(armorhudani.clip.name);
+                        nanoarmorhud.transform.localScale = new Vector3(nanosuitcore.ArmorhudScale.Value, nanosuitcore.ArmorhudScale.Value, 1);
+                        MeshRenderer[] armorhudMeshRenderer = nanoarmorhud.GetComponentsInChildren<MeshRenderer>();
+                        foreach (MeshRenderer child in armorhudMeshRenderer)
+                        {
+                            armorhudMeshRenderer[0].materials[0].SetFloat("_Innerfresnelintensity", nanosuitcore.ArmorhudAlpha.Value);
+                        }
+                    }
+                    nanomode = 0;
+                    isstealth = false;
+                    isarmor = true;
+                }
+                if (nanomode == 3 && !isenergyempty)//判断现在是否启动隐身模式
+                {
+                    if (nanoarmor != null)
+                    {
+                        Destroy(nanoarmor);
+                    }
+                    if (nanoarmorhud != null)
+                    {
+                        Destroy(nanoarmorhud);
+                    }
+                    if (nanoarmarmor != null)
+                    {
+                        Destroy(nanoarmarmor);
+                    }
+                    var nanoarmorbase = Instantiate(stealthPrefab, gameObject.transform.position, transform.rotation);
+                    nanoarmor = nanoarmorbase as GameObject;
+                    nanoarmor.transform.parent = this.transform;
+                    isstealth = true;
+                    isarmor = false;
+                    nanomode = 0;
+                }
+                if (!isclick && !isfly && nanosuitcore.flycore.Value && !isenergyempty)//是否启动飞行模式
+                {
+                    timer -= Time.deltaTime;
+                    if (Input.GetKeyDown(KeyCode.Space) && First == Clickcount.zerotime)
+                    {
+                        timer = 0.8f;
+                        First = Clickcount.firsttime;
+
+                    }
+                    if (Input.GetKeyUp(KeyCode.Space) && First == Clickcount.firsttime)
+                    {
+                        First = Clickcount.secondtime;
+
+                    }
+                    if (timer < 0f)
+                    {
+                        First = Clickcount.zerotime;
+                    }
+                    if (Input.GetKey(KeyCode.Space) && First == Clickcount.secondtime && timer > 0f && nanosuitcore.flycore.Value)
+                    {
+                        var floorbase = Instantiate(flymodePrefab, gameObject.transform.position, transform.rotation);
+                        flymode = floorbase as GameObject;
+                        flymode.transform.parent = this.transform;
+                        isclick = true;
+                        isfly = true;
+                        First = Clickcount.zerotime;
+                        //Console.WriteLine(floorobject.transform.parent.localPosition);
+                    }
+                }
+                if (isfly)
+                {
+                    flymode.transform.Translate(0, 0, 0.1f * Time.deltaTime);
+                }
+                if (Input.GetKeyUp(KeyCode.Space) && isfly)
+                {
+                    Destroy(flymode);
+                    isfly = false;
+                    isclick = false;
+                    if (!isstealth || !isarmor || !isnanovision)
+                    {
+                        ischarging = true;
+                        energytimer = 0;
+                    }
+                }
+                if (isenergyempty)//判断能量是否耗尽
+                {
+                    if (!isplayaudio)
+                    {
+                        nanoenergyhud.GetComponent<AudioSource>().Play();
+                        isplayaudio = true;
+                    }
+                    maxenergy = 0;
+                    armorvoice = 0;
+                    stealthvoice = 2;
+                    newmaterial[0] = basematerial;
+                    newmaterial[1] = basematerial02;
+                    Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
+                    if (nanoarmor != null)
+                    {
+                        Destroy(nanoarmor);
+                    }
+                    if (nanoarmorhud != null)
+                    {
+                        Destroy(nanoarmorhud);
+                    }
+                    if (nanoarmarmor != null)
+                    {
+                        Destroy(nanoarmarmor);
+                    }
+                    if (flymode != null)
+                    {
+                        Destroy(flymode);
+                    }
                     if (nanovisionhud != null)
                     {
                         Destroy(nanovisionhud);
@@ -516,238 +758,112 @@ namespace nanosuit
                     {
                         for (int i = 1; i < 100; i++)//获取全部AI
                         {
-                         Destroy(AItarget[i]);
-                        }
-                    }
-                    if (!isstealth || !isarmor ||!isfly)
-                    {
-                        ischarging = true;
-                        energytimer = 0;
-                    }
-                }
-            }
-            if (nanomode == 1 && !isenergyempty)//判断现在是否启动装甲模式
-            {
-                if (nanoarmor != null)
-                {
-                    Destroy(nanoarmor);
-                }
-                var nanoarmorbase = Instantiate(armorPrefab, this.transform.position, this.transform.rotation);
-                nanoarmor = nanoarmorbase as GameObject;
-                nanoarmor.transform.parent = this.transform;
-                var nanoarmarmorbase = Instantiate(armarmorPrefab, marktarget.transform.position, marktarget.transform.rotation);
-                nanoarmarmor = nanoarmarmorbase as GameObject;
-                nanoarmarmor.transform.parent = marktarget.transform;
-                if (nanoarmorhud == null)
-                {
-                    var nanoarmorhudbase = Instantiate(armorhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
-                    nanoarmorhud = nanoarmorhudbase as GameObject;
-                    armorhudani = nanoarmorhud.GetComponent<Animation>();
-                    nanoarmorhud.transform.parent = marktarget.transform;                  
-                }
-                if (armorhudani != null)
-                {
-                    armorhudani[armorhudani.clip.name].time = 0;
-                    armorhudani[armorhudani.clip.name].speed = 1;
-                    armorhudani.Play(armorhudani.clip.name);
-                    nanoarmorhud.transform.localScale = new Vector3(nanosuitcore.ArmorhudScale.Value, nanosuitcore.ArmorhudScale.Value, 1);
-                }               
-                nanomode = 0;
-                isstealth = false;
-                isarmor = true;
-            }
-            if (nanomode == 3 && !isenergyempty)//判断现在是否启动隐身模式
-            {
-                if (nanoarmor != null)
-                {
-                    Destroy(nanoarmor);
-                }
-                if (nanoarmorhud != null)
-                {
-                    Destroy(nanoarmorhud);
-                }
-                if (nanoarmarmor != null)
-                {
-                    Destroy(nanoarmarmor);
-                }
-                var nanoarmorbase = Instantiate(stealthPrefab, gameObject.transform.position, transform.rotation);
-                nanoarmor = nanoarmorbase as GameObject;
-                nanoarmor.transform.parent = this.transform;
-                isstealth = true;
-                isarmor = false;
-                nanomode = 0;
-            }
-            if (!isclick && !isfly && nanosuitcore.flycore.Value && !isenergyempty)//是否启动飞行模式
-            {
-                timer -= Time.deltaTime;
-                if (Input.GetKeyDown(KeyCode.Space) && First == Clickcount.zerotime)
-                {
-                    timer = 0.8f;
-                    First = Clickcount.firsttime;
-
-                }
-                if (Input.GetKeyUp(KeyCode.Space) && First == Clickcount.firsttime)
-                {
-                    First = Clickcount.secondtime;
-
-                }
-                if (timer < 0f)
-                {
-                    First = Clickcount.zerotime;
-                }
-                if (Input.GetKey(KeyCode.Space) && First == Clickcount.secondtime && timer > 0f && nanosuitcore.flycore.Value)
-                {
-                    var floorbase = Instantiate(flymodePrefab, gameObject.transform.position, transform.rotation);
-                    flymode = floorbase as GameObject;
-                    flymode.transform.parent = this.transform;
-                    isclick = true;
-                    isfly = true;
-                    First = Clickcount.zerotime;
-                    //Console.WriteLine(floorobject.transform.parent.localPosition);
-                }
-            }
-            if (isfly)
-            {
-                flymode.transform.Translate(0, 0, 0.1f * Time.deltaTime);
-            }
-            if (Input.GetKeyUp(KeyCode.Space) && isfly)
-            {
-                Destroy(flymode);
-                isfly = false;
-                isclick = false;
-                if (!isstealth||!isarmor||!isnanovision)
-                {
-                    ischarging = true;
-                    energytimer = 0;
-                }
-            }          
-            if (isenergyempty)//判断能量是否耗尽
-            {
-                if (!isplayaudio)
-                {
-                nanoenergyhud.GetComponent<AudioSource>().Play();
-                isplayaudio=true;
-                }
-                maxenergy = 0;
-                armorvoice = 0;
-                stealthvoice = 2;
-                newmaterial[0] = basematerial;
-                newmaterial[1] = basematerial02;
-                Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
-                if (nanoarmor != null)
-                {
-                    Destroy(nanoarmor);
-                }
-                if (nanoarmorhud != null)
-                {
-                    Destroy(nanoarmorhud);
-                }
-                if (nanoarmarmor != null)
-                {
-                    Destroy(nanoarmarmor);
-                }
-                if (flymode != null)
-                {
-                    Destroy(flymode);
-                }
-                if (nanovisionhud != null)
-                {
-                    Destroy(nanovisionhud);
-                }
-                if (AItarget != null)
-                {
-                    for (int i = 1; i < 100; i++)//获取全部AI
-                    {
-                        if (AItarget[i] != null)
-                        {
-                            Destroy(AItarget[i]);
-                        }
-                    }
-                }
-                isfly = false;
-                isclick = false;
-                isstealth = false;
-                isarmor = false;
-                isnanovision = false;
-                energytimer += Time.deltaTime;
-                if (energytimer >= 1)
-                {
-                    energytimer = 0;
-                    ischarging = true;
-                    isenergy = false;
-                    isenergyempty = false;
-                }  
-            }
-            if (isstealth)//隐身模式能量自然消耗
-            {
-                maxenergy -= Time.deltaTime * stealthbasecost;
-                ischarging = false;
-                if (maxenergy <= 0)
-                {
-                    maxenergy = 0;
-                    energytimer = 0;
-                    isenergyempty = true;
-                }
-            }
-            if (isarmor)//装甲模式能量自然消耗
-            {
-                maxenergy -= Time.deltaTime * armorbasecost;
-                ischarging = false;
-                if (maxenergy <= 0)
-                {
-                    maxenergy = 0;
-                    energytimer = 0;
-                    isenergyempty = true;
-                }
-                if (isarmorhit)
-                {
-                    StartCoroutine("ArmorHit");
-                    isarmorhit = false;
-                }
-                if (isarmorhitdanger)
-                {
-                    StartCoroutine("ArmorHitdanger");
-                    isarmorhitdanger = false;
-                }
-            }
-            if (isfly)//飞行模式能量自然消耗
-            {
-                maxenergy -= Time.deltaTime * flybasecost;
-                ischarging = false;
-                if (maxenergy <= 0)
-                {
-                    maxenergy = 0;
-                    energytimer = 0;
-                    isenergyempty = true;
-                }
-            }
-            if (isnanovision && Entermap())//纳米视野能量自然消耗
-            {
-                maxenergy -= Time.deltaTime * nanovisionbasecost;
-                ischarging = false;
-                if (maxenergy <= 0)
-                {
-                    maxenergy = 0;
-                    energytimer = 0;
-                    isenergyempty = true;
-                }
-                if (!isenergyempty)
-                {
-                    if (gameWorld.AllPlayers.Count >= 2)
-                    {
-                        for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
-                        {
-                            AIhealth[i] = gameWorld.AllPlayers[i].HealthController.IsAlive;
-                            if (!AIhealth[i])
+                            if (AItarget[i] != null)
                             {
                                 Destroy(AItarget[i]);
                             }
-                            if (AItarget[i] != null && AIhealth[i])
+                        }
+                    }
+                    if (gameWorld.AllPlayers[0].ActiveHealthController.DamageCoeff != 1f && Entermap())
+                    {
+                        gameWorld.AllPlayers[0].ActiveHealthController.SetDamageCoeff(1f);
+                    }
+                    isfly = false;
+                    isclick = false;
+                    isstealth = false;
+                    isarmor = false;
+                    isnanovision = false;
+                    energytimer += Time.deltaTime;
+                    if (energytimer >= 1)
+                    {
+                        energytimer = 0;
+                        ischarging = true;
+                        isenergy = false;
+                        isenergyempty = false;
+                    }
+                }
+                if (isstealth)//隐身模式能量自然消耗
+                {
+                    maxenergy -= Time.deltaTime * stealthbasecost;
+                    ischarging = false;
+                    if (maxenergy <= 0)
+                    {
+                        maxenergy = 0;
+                        energytimer = 0;
+                        isenergyempty = true;
+                    }
+                }
+                if (isarmor)//装甲模式能量自然消耗
+                {
+                    maxenergy -= Time.deltaTime * armorbasecost;
+                    ischarging = false;
+                    if (maxenergy <= 0)
+                    {
+                        maxenergy = 0;
+                        energytimer = 0;
+                        isenergyempty = true;
+                    }
+                    if (isarmorhit)
+                    {
+                        StartCoroutine("ArmorHit");
+                        isarmorhit = false;
+                    }
+                    if (isarmorhitdanger)
+                    {
+                        StartCoroutine("ArmorHitdanger");
+                        isarmorhitdanger = false;
+                    }
+                    if (gameWorld.AllPlayers[0].ActiveHealthController.DamageCoeff != -1f && Entermap())
+                    {
+                        gameWorld.AllPlayers[0].ActiveHealthController.SetDamageCoeff(-1f);
+                    }
+                }
+                if (isfly)//飞行模式能量自然消耗
+                {
+                    maxenergy -= Time.deltaTime * flybasecost;
+                    ischarging = false;
+                    if (maxenergy <= 0)
+                    {
+                        maxenergy = 0;
+                        energytimer = 0;
+                        isenergyempty = true;
+                    }
+                }
+                if (isnanovision && Entermap())//纳米视野能量自然消耗
+                {
+                    maxenergy -= Time.deltaTime * nanovisionbasecost;
+                    ischarging = false;
+                    if (maxenergy <= 0)
+                    {
+                        maxenergy = 0;
+                        energytimer = 0;
+                        isenergyempty = true;
+                    }
+                    if (!isenergyempty)
+                    {
+                        if (gameWorld.AllPlayers.Count >= 2)
+                        {
+                            for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
                             {
-                                AItarget[i].transform.position = gameWorld.AllPlayers[i].Transform.position;
+                                AIhealth[i] = gameWorld.AllPlayers[i].HealthController.IsAlive;
+                                if (!AIhealth[i])
+                                {
+                                    Destroy(AItarget[i]);
+                                }
+                                if (AItarget[i] != null && AIhealth[i])
+                                {
+                                    AItarget[i].transform.position = gameWorld.AllPlayers[i].Transform.position;
+                                }
                             }
                         }
                     }
+                }
+            }
+            if (!nanosuitcore.NanoSystemOnline.Value)
+            {
+                if (nanoenergyhud != null)
+                {
+                    Destroy(nanoenergyhud);
                 }
             }
         }
@@ -815,7 +931,7 @@ namespace nanosuit
                 {
                     armorhudMeshRenderer[0].materials[0].SetFloat("_Maintextureintensity", ArmorColorhit);
                     armorhudMeshRenderer[0].materials[0].SetColor("_Edgecolor", ArmorColor);
-                    while (ArmorColorhit >= 0.6f)
+                    while (ArmorColorhit >= nanosuitcore.ArmorhudAlpha.Value)
                     {
                         ArmorColorhit -= 0.5f;
                         armorhudMeshRenderer[0].materials[0].SetFloat("_Maintextureintensity", ArmorColorhit);
@@ -838,7 +954,7 @@ namespace nanosuit
                 {
                     armorhudMeshRenderer[0].materials[0].SetFloat("_Maintextureintensity", ArmorColorhit);
                     armorhudMeshRenderer[0].materials[0].SetColor("_Edgecolor", ArmorColor);
-                    while (ArmorColorhit >= 0.6f)
+                    while (ArmorColorhit >= nanosuitcore.ArmorhudAlpha.Value)
                     {
                         ArmorColorhit -= 0.5f;
                         armorhudMeshRenderer[0].materials[0].SetFloat("_Maintextureintensity", ArmorColorhit);       
@@ -1115,19 +1231,22 @@ namespace nanosuit
         [PatchPostfix]
         static void PostFix(ref Player __instance, EDamageType type)
         {
-            if (__instance.IsYourPlayer && (type == EDamageType.Bullet || type == EDamageType.Explosion || type == EDamageType.Sniper || type == EDamageType.Landmine || type == EDamageType.GrenadeFragment || type == EDamageType.Barbed))
+            if (__instance.IsYourPlayer && (type == EDamageType.Bullet || type == EDamageType.Explosion || type == EDamageType.Sniper || type == EDamageType.Landmine || type == EDamageType.GrenadeFragment || type == EDamageType.Barbed || type == EDamageType.Fall))
             {
-                const float delayTime = 0f;//延迟时间
-                const float workTime = 60f;//持续时间
-                const float residueTime = 0f; //残留时间
-                const float strength = 5f;//强度
+                //const float delayTime = 0f;//延迟时间
+                //const float workTime = 60f;//持续时间
+                //const float residueTime = 0f; //残留时间
+                //const float strength = 5f;//强度
+                nanosuit.startfixdebuff = true;
+                nanosuit.iscureyourself = false;
+                nanosuit.fixdelaytime = 0;
                 //如果已经有Buff就在原Buff上添加时长
-                if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "HealthBoost"))//其它效果在GClass2103（3.5.0客户端）2112（351-353客户端）
-                {
-                    ActiveHealthControllerClass.GClass2103 nanoHealthBoost = typeof(ActiveHealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("HealthBoost", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthControllerClass.GClass2103;
-                    if (nanoHealthBoost.TimeLeft < 60) nanoHealthBoost.AddWorkTime(60f, false); //350是2091；351-353是2100；355是2103
-                    return;
-                }
+                //if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "HealthBoost"))//其它效果在GClass2103（3.5.0客户端）2112（351-353客户端）
+                //{
+                //ActiveHealthControllerClass.GClass2103 nanoHealthBoost = typeof(ActiveHealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("HealthBoost", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthControllerClass.GClass2103;
+                //if (nanoHealthBoost.TimeLeft < 60) nanoHealthBoost.AddWorkTime(60f, false); //350是2091；351-353是2100；355是2103
+                //return;
+                //}
                 if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "PainKiller"))
                 {
                     ActiveHealthControllerClass.GClass2103 nanoPainKiller = typeof(ActiveHealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthControllerClass.GClass2103;
@@ -1137,7 +1256,24 @@ namespace nanosuit
 
                 MethodInfo method = typeof(ActiveHealthControllerClass).GetMethod("method_15", BindingFlags.Instance | BindingFlags.NonPublic);
                 method.MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, 0f, 60f, 0f, 1f, null });
-                method.MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("HealthBoost", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, delayTime, workTime, residueTime, strength, null });
+                //method.MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("HealthBoost", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, delayTime, workTime, residueTime, strength, null });
+            }
+        }
+    }
+
+    public class NanoSystemPatch : ModulePatch
+    {
+        //搜索EFT空间下的Player类里的OnBeenKilledByAggressor
+        protected override MethodBase GetTargetMethod()
+        {
+            return typeof(Player).GetMethod("OnBeenKilledByAggressor", BindingFlags.Instance | BindingFlags.NonPublic);
+        }
+        [PatchPostfix]
+        private static void PatchPostFix(ref Player __instance, Player aggressor)
+        {
+            if (aggressor.IsYourPlayer)
+            {
+                Console.WriteLine("你做掉了一个AI" );
             }
         }
     }
