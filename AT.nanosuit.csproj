@@ -33,7 +33,6 @@
   <ItemGroup>
     <Reference Include="%28355%29Assembly-CSharp">
       <HintPath>..\(355)Assembly-CSharp.dll</HintPath>
-      <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">
       <HintPath>..\0Harmony.dll</HintPath>

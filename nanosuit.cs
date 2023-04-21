@@ -15,7 +15,7 @@ using System.Collections;
 
 namespace nanosuit
 {
-    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "1.0.8")]
+    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "1.0.9")]
     public class nanosuitcore : BaseUnityPlugin
     {
         // 窗口开关
@@ -27,6 +27,7 @@ namespace nanosuit
         public static ConfigEntry<int> nanocharg;
         public static ConfigEntry<int> nanochargdelay;
         public static ConfigEntry<int> nanovisioncost;
+        public static ConfigEntry<int> FixDelay;
         public static ConfigEntry<bool> flycore;
         public static ConfigEntry<bool> NanoSystemOnline;
         public static ConfigEntry<bool> curemodeOnline;
@@ -39,7 +40,8 @@ namespace nanosuit
         public static ConfigEntry<float> Xzhou;
         public static ConfigEntry<float> Yzhou;
         public static ConfigEntry<float> ArmorhudScale;
-        public static ConfigEntry<float> ArmorhudAlpha;
+        public static ConfigEntry<float> ArmorhudAlpha;       
+        public static ConfigEntry<float> FixIntensity;
         public static string[] nanouplist = { "生存强化(Enhanced Survival)", "装甲强化(Enhanced Armor)", "隐身强化(Enhanced Stealth)", "充能强化(Enhanced Charge)", "推进器强化(Enhanced Propeller)", "纳米视野强化(Enhanced Nanovision)" };
         public static string[] languagelist = { "中文", "English"};
         public void Awake()
@@ -69,7 +71,9 @@ namespace nanosuit
             nanovisioncost = Config.Bind<int>("纳米视野设置(Nanovision Settings)", "纳米视野消耗(Nanovision Cost)", 8, "纳米视野开启后每秒能量消耗值(Natural energy cost per second in Nanovision mode)");
             nanovolume = Config.Bind("纳米系统设置(Nanosystem Settings)", "设置音量(Volume Settings)", 1f, new ConfigDescription("纳米服各个模式启动时的音效音量(The sound volume of each mode on the Nano Suit)", new AcceptableValueRange<float>(0f, 1f)));
             NanoSystemOnline = Config.Bind<bool>("纳米系统设置(Nanosystem Settings)", "纳米系统是否启动(NanoSystem online or not)", true, "纳米机器，小子！启动纳米系统(Nanomachine,son!Start-up NanoSystem)");
-            curemodeOnline = Config.Bind<bool>("纳米系统设置(Nanosystem Settings)", "自动修复系统是否启动(Automatic treatment system online or not)", true, "你为什么还不死？受伤10秒后修复全部黑色部位，去除所有负面效果，缓慢回复所有生命值(Why don't you die?Remove all negative states, repair black areas, and restore all health after 10 seconds of damage)");
+            curemodeOnline = Config.Bind<bool>("自动修复系统设置(Automatic Treatment System Settings)", "自动修复系统是否启动(Automatic treatment system online or not)", true, "你为什么还不死？选择生存强化后受伤10秒后修复全部黑色部位，去除所有负面效果，缓慢回复所有生命值(Why don't you die?After choosing Enhanced Survival,remove all negative states, repair black areas, and restore all health after 10 seconds of damage)");
+            FixIntensity = Config.Bind("自动修复系统设置(Automatic Treatment System Settings)", "修复速度(Treatment Rate)", 0.1f, new ConfigDescription("触发自动修复后的修复速率(Rate of Treatment after Automatic Treatment is triggered)", new AcceptableValueRange<float>(0f, 1f)));
+            FixDelay = Config.Bind<int>("自动修复系统设置(Automatic Treatment System Settings)", "修复延迟(Treatment Delay)", 10, "收到伤害后延迟几秒后开始自动修复(After receiving damage delay of a few seconds, Automatic Treatment begins)");
         }
         void Update()
         {
@@ -235,7 +239,7 @@ namespace nanosuit
                         var RightArmHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.RightArm, true);
                         var RightLegHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.RightLeg, true);
                         var StomachHP = gameWorld.AllPlayers[0].ActiveHealthController.GetBodyPartHealth(EBodyPart.Stomach, true);
-                        if (fixdelaytime >= 10 && !iscureyourself)
+                        if (fixdelaytime >= nanosuitcore.FixDelay.Value && !iscureyourself)
                         {
                             gameWorld.AllPlayers[0].ActiveHealthController.RemoveNegativeEffects(EBodyPart.Common);
                             gameWorld.AllPlayers[0].ActiveHealthController.RestoreBodyPart(EBodyPart.LeftArm, 1f);
@@ -259,38 +263,38 @@ namespace nanosuit
                             var nowHPStomach = StomachHP.Current;
                             if (nowHPHead < HeadHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Head, 0.1f, default);
-                                nowHPHead += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Head, nanosuitcore.FixIntensity.Value, default);
+                                nowHPHead += nanosuitcore.FixIntensity.Value;
                             }
                             if (nowHPChest < ChestHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Chest, 0.1f, default);
-                                nowHPChest += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Chest, nanosuitcore.FixIntensity.Value, default);
+                                nowHPChest += nanosuitcore.FixIntensity.Value;
                             }
                             if (nowHPLeftArm < LeftArmHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.LeftArm, 0.1f, default);
-                                nowHPLeftArm += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.LeftArm, nanosuitcore.FixIntensity.Value, default);
+                                nowHPLeftArm += nanosuitcore.FixIntensity.Value;
                             }
                             if (nowHPLeftLeg < LeftLegHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.LeftLeg, 0.1f, default);
-                                nowHPLeftLeg += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.LeftLeg, nanosuitcore.FixIntensity.Value, default);
+                                nowHPLeftLeg += nanosuitcore.FixIntensity.Value;
                             }
                             if (nowHPRightArm < RightArmHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.RightArm, 0.1f, default);
-                                nowHPRightArm += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.RightArm, nanosuitcore.FixIntensity.Value, default);
+                                nowHPRightArm += nanosuitcore.FixIntensity.Value;
                             }
                             if (nowHPRightLeg < RightLegHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.RightLeg, 0.1f, default);
-                                nowHPRightLeg += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.RightLeg, nanosuitcore.FixIntensity.Value, default);
+                                nowHPRightLeg += nanosuitcore.FixIntensity.Value;
                             }
                             if (nowHPStomach < StomachHP.Maximum)
                             {
-                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Stomach, 0.1f, default);
-                                nowHPStomach += 0.1f;
+                                gameWorld.AllPlayers[0].ActiveHealthController.ChangeHealth(EBodyPart.Stomach, nanosuitcore.FixIntensity.Value, default);
+                                nowHPStomach += nanosuitcore.FixIntensity.Value;
                             }
                             NOWHP = nowHPStomach + nowHPRightLeg + nowHPRightArm + nowHPLeftLeg + nowHPLeftArm + nowHPChest + nowHPHead;
                             MAXHP = HeadHP.Maximum + ChestHP.Maximum + LeftArmHP.Maximum + LeftLegHP.Maximum + RightArmHP.Maximum + RightLegHP.Maximum + StomachHP.Maximum;
@@ -327,6 +331,8 @@ namespace nanosuit
                     nanosuitcore.nanochargdelay.Value = 2;
                     nanosuitcore.flycost.Value = 15;
                     nanosuitcore.nanovisioncost.Value = 8;
+                    nanosuitcore.FixIntensity.Value = 0.1f;
+                    nanosuitcore.FixDelay.Value = 10;
                     armorbasecost = 1;
                     armorpowerbase = 90;
                     isshengcun = false;
@@ -352,6 +358,8 @@ namespace nanosuit
                     nanosuitcore.nanochargdelay.Value = 2;
                     nanosuitcore.flycost.Value = 15;
                     nanosuitcore.nanovisioncost.Value = 8;
+                    nanosuitcore.FixIntensity.Value = 0.1f;
+                    nanosuitcore.FixDelay.Value = 10;
                     stealthbasecost = 3;
                     isshengcun = false;
                 }
@@ -369,6 +377,8 @@ namespace nanosuit
                     nanosuitcore.stealthcost.Value = 5;
                     nanosuitcore.flycost.Value = 15;
                     nanosuitcore.nanovisioncost.Value = 8;
+                    nanosuitcore.FixIntensity.Value = 0.1f;
+                    nanosuitcore.FixDelay.Value = 10;
                     nanodelaychargbase = 1;
                     nanochargbase = 50;
                     isshengcun = false;
@@ -386,6 +396,8 @@ namespace nanosuit
                     nanosuitcore.stealthcost.Value = 5;
                     nanosuitcore.flycost.Value = 5;
                     nanosuitcore.nanovisioncost.Value = 8;
+                    nanosuitcore.FixIntensity.Value = 0.1f;
+                    nanosuitcore.FixDelay.Value = 10;
                     flybasecost = 5;
                     isshengcun = false;
                 }
@@ -402,6 +414,8 @@ namespace nanosuit
                     nanosuitcore.stealthcost.Value = 5;
                     nanosuitcore.flycost.Value = 15;
                     nanosuitcore.nanovisioncost.Value = 2;
+                    nanosuitcore.FixIntensity.Value = 0.1f;
+                    nanosuitcore.FixDelay.Value = 10;
                     nanovisionbasecost = 2;
                     isshengcun = false;
                 }
@@ -673,6 +687,10 @@ namespace nanosuit
                     var nanoarmorbase = Instantiate(stealthPrefab, gameObject.transform.position, transform.rotation);
                     nanoarmor = nanoarmorbase as GameObject;
                     nanoarmor.transform.parent = this.transform;
+                    if (gameWorld.AllPlayers[0].ActiveHealthController.DamageCoeff != 1f && Entermap())
+                    {
+                        gameWorld.AllPlayers[0].ActiveHealthController.SetDamageCoeff(1f);
+                    }
                     isstealth = true;
                     isarmor = false;
                     nanomode = 0;
@@ -791,6 +809,10 @@ namespace nanosuit
                         maxenergy = 0;
                         energytimer = 0;
                         isenergyempty = true;
+                    }
+                    if (gameWorld.AllPlayers[0].ActiveHealthController.DamageCoeff != 1f && Entermap())
+                    {
+                        gameWorld.AllPlayers[0].ActiveHealthController.SetDamageCoeff(1f);
                     }
                 }
                 if (isarmor)//装甲模式能量自然消耗
