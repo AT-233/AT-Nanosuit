@@ -33,6 +33,7 @@
   <ItemGroup>
     <Reference Include="%28355%29Assembly-CSharp">
       <HintPath>..\(355)Assembly-CSharp.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">
       <HintPath>..\0Harmony.dll</HintPath>
@@ -102,10 +103,24 @@
       <HintPath>..\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>..\UnityEngine.UIModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Broadcast\NanoBroadcast.cs" />
+    <Compile Include="GUI\NanoGUI.cs" />
+    <Compile Include="minimap\NanoMimiradarenemy.cs" />
+    <Compile Include="minimap\NanoMiniMapCompass.cs" />
+    <Compile Include="minimap\NanoMimiradarplayer.cs" />
     <Compile Include="nanosuit.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
