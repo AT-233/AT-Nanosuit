@@ -82,6 +82,12 @@ namespace nanosuit
             {
                 NanoBroadcast.killone = true;
             }
+            if (nanosuitcore.nanoup.Value == "ÄÜÁ¿ÎüÊÕ(Energy absorption)")
+            {
+                nanosuit.maxenergy+=30;
+                if(nanosuit.maxenergy>=100) nanosuit.maxenergy = 100;
+            }
         }
     }
+    
 }

@@ -16,11 +16,14 @@ namespace nanosuit
         // Update is called once per frame
         void Update()
         {
-            if (player == null)
+            if(nanosuitcore.Lockradar.Value)
             {
-                player = GameObject.Find("Nanohands");//找到玩家
-            }
-            this.GetComponent<RectTransform>().eulerAngles = new Vector3(0, 0, -player.transform.eulerAngles.y+180);
+                if (player == null)
+                {
+                    player = GameObject.Find("Nanohands");//找到玩家
+                }
+                this.GetComponent<RectTransform>().eulerAngles = new Vector3(0, 0, -player.transform.eulerAngles.y + 180);
+            }           
         }
     }
 }

@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using EFT.InventoryLogic;
 using HarmonyLib;
+using System.Collections;
 
 namespace nanosuit
 {
@@ -47,6 +48,7 @@ namespace nanosuit
         public static bool befound;
         public static bool ready;
         private float timeFade;
+        private float jumpFade;
         private bool isweapon;
         private Weapon NowWeapon;
         private static Player NanoPlayer;
@@ -60,6 +62,7 @@ namespace nanosuit
             ready = true;
             isweapon = false;
             timeFade = 0f;
+            jumpFade = Physics.gravity.y;
             new NanoWaring().Enable();//启动AI警告    
         }
 
@@ -68,6 +71,7 @@ namespace nanosuit
         {
             if (nanosuitcore.AmmoUIOnline.Value)
             {
+                ammopack.SetActive(true);
                 if (NanoPlayer == null)
                 {
                     NanoPlayer = gameWorld.MainPlayer;
@@ -91,6 +95,7 @@ namespace nanosuit
                     if (NowItemController.Template.UnlootableFromSlot == "FirstPrimaryWeapon" && NowItemController.Template._parent != "543be6564bdc2df4348b4568")
                     {
                         //Console.WriteLine(NanoPlayer.MovementContext.MaxSpeed);
+                        MovementState.G = new Vector3(0, -6, 0);
                         isweapon = true;
                     }
                     if (NowItemController.Template._parent == "543be6564bdc2df4348b4568")
@@ -181,14 +186,15 @@ namespace nanosuit
                 {
                     AmmoText.GetComponent<Text>().text = "C♂ME";
                     Closeui();
-                    noweapon.GetComponent<Image>().enabled = false;
+                    noweapon.GetComponent<Image>().enabled = true;
                 }
             }
             else
             {
                 AmmoText.GetComponent<Text>().text = "NULL";
                 Closeui();
-                noweapon.GetComponent<Image>().enabled = false;
+                noweapon.GetComponent<Image>().enabled = true;
+                ammopack.SetActive(false);
             } 
             if (NormalMode != null)
             {
@@ -212,7 +218,12 @@ namespace nanosuit
                     Closemode();
                     CloakMode.GetComponent<RawImage>().enabled = true;
                 }
-                if (!nanosuit.isstealth && !nanosuit.isarmor)
+                if (nanosuit.ispower)
+                {
+                    Closemode();
+                    PowerMode.GetComponent<RawImage>().enabled = true;
+                }
+                if (!nanosuit.isstealth && !nanosuit.isarmor && !nanosuit.ispower)
                 {
                     Closemode();
                     NormalMode.GetComponent<RawImage>().enabled = true;
@@ -254,6 +265,14 @@ namespace nanosuit
             {
                 NanoHealth.GetComponent<Image>().color = Color.white;
             }
+            if (NanoHealth1.fillAmount <= 0.2)
+            {
+                NanoHealth1.GetComponent<Image>().color = Color.red;
+            }
+            else
+            {
+                NanoHealth1.GetComponent<Image>().color = Color.white;
+            }
             if (nanosuit.maxenergy <= 20)
             {
                 NanoEnergy.GetComponent<Image>().color = Color.red;
@@ -267,6 +286,10 @@ namespace nanosuit
                 EnemyFound.GetComponent<RawImage>().enabled = true;
                 ready = false;
                 befound = false;
+                if (!nanosuit.isstealth && !nanosuit.isarmor && !nanosuit.ispower)
+                {
+                    nanosuit.isautoarmor = true;
+                }
                 //Console.WriteLine("被锁定");
             }
             if (!ready)
@@ -279,7 +302,16 @@ namespace nanosuit
                     EnemyFound.GetComponent<RawImage>().enabled = false;
                 }
             }
-            if(EnemyFound == null) Console.WriteLine("没警告");
+            if (Input.GetKeyDown(KeyCode.Space) && nanosuit.ispower)
+            {
+                if(Physics.gravity.y == jumpFade)
+                {
+                    StartCoroutine("PowerJump");
+                    PowerMode.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
+                    PowerMode.GetComponent<AudioSource>().Play();
+                    nanosuit.maxenergy -= 15;
+                }   
+            }
         }
         private void Closeui()
         {
@@ -306,6 +338,21 @@ namespace nanosuit
             SpeedMode.GetComponent<RawImage>().enabled = false;
             PowerMode.GetComponent<RawImage>().enabled = false;
         }
+        IEnumerator PowerJump()
+        {
+            float Nowgravity;
+            Nowgravity = 0f;
+            while (Nowgravity > jumpFade)
+            {
+                Nowgravity -= 0.09f;
+                if(Nowgravity <= jumpFade)
+                {
+                    Nowgravity = jumpFade;
+                }
+                Physics.gravity = new Vector3(0, Nowgravity, 0);
+                yield return 0;
+            }
+        }
     }   
     public class NanoWaring : ModulePatch //来自山姆特警的第六感
     {
@@ -322,8 +369,17 @@ namespace nanosuit
             var person = (IAIDetails)__instance.GetType().GetProperty("Person").GetValue(__instance);
             if (!value || !person.GetPlayer.IsYourPlayer || !___bool_0) return;
             //if (person.GetPlayer.IsYourPlayer) 
-            NanoGUI.befound = true;
+            NanoGUI.befound = true;           
             CoolTime = Time.time + 3f;
         }
     }
+    //[HarmonyPatch(typeof(Player), "MaxSpeed", MethodType.Setter)]
+    //class NanoSpeedPatch
+    //{
+    //    public static bool Prefix(ref float MaxSpeed)
+    //    {
+    //        MaxSpeed = 100f;
+    //        return false; //拦截原方法，直接使用我们给出的结果
+    //    }
+    //}
 }

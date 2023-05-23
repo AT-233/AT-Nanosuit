@@ -31,8 +31,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="%28355%29Assembly-CSharp">
-      <HintPath>..\(355)Assembly-CSharp.dll</HintPath>
+    <Reference Include="%28356%29Assembly-CSharp">
+      <HintPath>..\(356)Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">

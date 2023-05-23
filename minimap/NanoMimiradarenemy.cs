@@ -13,6 +13,7 @@ namespace nanosuit
         public Image enemyuesd;
         public Image enemyuesdup;
         public Image enemyuesdlow;
+        public Image radarback;
         private bool findenemy;
         // Start is called before the first frame update
         void Start()
@@ -31,7 +32,15 @@ namespace nanosuit
             float x = (this.transform.position.x - player.transform.position.x) / 100;
             float z = (this.transform.position.z - player.transform.position.z) / 100;
             float y = (this.transform.position.y - player.transform.position.y);
-            if (findenemy && dis < 100 && findenemy)
+            if (!nanosuitcore.Lockradar.Value)
+            {
+                if (player == null)
+                {
+                    player = GameObject.Find("Nanohands");//找到玩家
+                }
+                radarback.GetComponent<RectTransform>().eulerAngles = new Vector3(0, 0, player.transform.eulerAngles.y + 180);
+            }
+            if (findenemy && dis < 100)
             {
                 findenemy = false;
   
