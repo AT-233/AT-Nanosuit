@@ -31,8 +31,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="%28356%29Assembly-CSharp">
-      <HintPath>..\(356)Assembly-CSharp.dll</HintPath>
+    <Reference Include="%28357%29Assembly-CSharp">
+      <HintPath>..\(357)Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">
@@ -120,6 +120,7 @@
     <Compile Include="minimap\NanoMimiradarplayer.cs" />
     <Compile Include="nanosuit.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="weaponlink\gausslink.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

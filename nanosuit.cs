@@ -8,10 +8,12 @@ using BepInEx.Logging;
 using EFT;
 using HarmonyLib;
 using UnityEngine;
+using EFT.Interactive;
 using Aki.Reflection.Patching;
 using Object = UnityEngine.Object;
 using Comfort.Common;
 using System.Collections;
+using UnityEngine.SceneManagement;
 
 namespace nanosuit
 {
@@ -41,6 +43,9 @@ namespace nanosuit
         public static ConfigEntry<KeyCode> STEALTH;
         public static ConfigEntry<KeyCode> NANOVISION;
         public static ConfigEntry<KeyCode> POWER;
+        public static ConfigEntry<float> powercost;
+        public static ConfigEntry<float> powerweapon;
+        public static ConfigEntry<float> powerjumpcost;
         public static ConfigEntry<float> nanovolume;
         public static ConfigEntry<float> Xzhou;
         public static ConfigEntry<float> Yzhou;
@@ -63,6 +68,9 @@ namespace nanosuit
             ArmorhudScale = Config.Bind("装甲模式配置(Armor Settings)", "HUD缩放(HUD Scale)", 1f, new ConfigDescription("装甲模式下的HUD缩放(The HUD Scale in Armor mode)", new AcceptableValueRange<float>(0.8f, 3f)));
             ArmorhudAlpha = Config.Bind("装甲模式配置(Armor Settings)", "HUD透明度(HUD Alpha)", 0.3f, new ConfigDescription("装甲模式下的HUD透明度(The HUD Alpha in Armor mode)", new AcceptableValueRange<float>(0f, 0.5f)));
             stealthcost = Config.Bind<int>("隐身模式配置(Stealth Settings)", "隐身消耗(Stealth Cost)", 5, "隐身模式下能量自然消耗每秒的值(Natural energy cost per second in Stealth mode)");
+            powercost = Config.Bind<float>("力量模式配置(Power Settings)", "力量消耗(Power Cost)", 0.5f, "力量模式下能量自然消耗每秒的值(Natural energy cost per second in Power mode)");
+            powerjumpcost = Config.Bind<float>("力量模式配置(Power Settings)", "力量跳跃消耗(Power Jump Cost)", 15, "力量模式下每次跳跃消耗的能量(Energy cost per jump in Power Mode)");
+            powerweapon = Config.Bind("力量模式配置(Power Settings)", "力量后座(Power Recoil)", 0.1f, new ConfigDescription("力量模式下的武器后座力(Weapon recoil in Power mode)", new AcceptableValueRange<float>(0f, 1f)));
             nanocharg = Config.Bind<int>("充能配置(Charge Settings)", "充能速率(Charging Speed)", 25, "纳米服每秒充能速率(Nanosuit charge rate per second)");
             nanochargdelay = Config.Bind<int>("充能配置(Charge Settings)", "充能延迟(Charging Delay)", 2, "纳米服关闭功能后延迟几秒后开始充能(Turn off the function after a delay of a few seconds to start charging)");           
             nanoup = Config.Bind<string>("强化方案选择(Enhanced Choose)", "根据你的战斗习惯选择不同的强化方案(Depending on your combat habits, choose different Enhanced programs)", nanouplist[1], 
@@ -89,10 +97,10 @@ namespace nanosuit
         {
 
         }
-        [HarmonyPatch(typeof(GClass2623), "HitCollider", MethodType.Getter)]
+        [HarmonyPatch(typeof(GClass2624), "HitCollider", MethodType.Getter)]
         public class NanosuitClockMode
         {
-            public static void Postfix(GClass2623 __instance, ref Collider __result)//350是2611,351-353是2620, 355是2623
+            public static void Postfix(GClass2624 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624
             {
                 var hitman = __instance.Player;//获取是谁射的子弹
                 if (__result != null)
@@ -134,7 +142,7 @@ namespace nanosuit
         private int stealthvoice;
         private int powervoice;
         private int nanomode;
-        private int flybasecost = 15;
+        //private int flybasecost = 15;
         private GameObject clockbase;
         private GameObject nanoarmorhud;
         private GameObject nanoenergyhud;
@@ -236,6 +244,7 @@ namespace nanosuit
             if (nanosuitcore.NanoSystemOnline.Value)
             {
                 //FastMemu();
+                killMemu();
                 nowenergy = (int)maxenergy;
                 this.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;//纳米系统音量调整
                 gameWorld = Singleton<GameWorld>.Instance;
@@ -509,6 +518,7 @@ namespace nanosuit
                 {
                     isfirstarmor = false;
                     Destorynanohud();
+                    new BoyNextDoor().Enable();
                     if (nanovisionhud == null)
                     {
                         var nanovisionhudbase = Instantiate(nanovisionhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
@@ -530,6 +540,7 @@ namespace nanosuit
                     stealthvoice = 2;
                     if (powervoice >= 7)//力量模式是否关闭
                     {
+                        new BoyNextDoor().Disable();
                         newmaterial[0] = basematerial;
                         newmaterial[1] = basematerial02;
                         Hand.GetComponent<SkinnedMeshRenderer>().materials = newmaterial;
@@ -899,7 +910,7 @@ namespace nanosuit
                 if(ispower)//力量模式设置
                 {
                     ischarging = false;
-                    maxenergy -= Time.deltaTime * 0.5f;
+                    maxenergy -= Time.deltaTime * nanosuitcore.powercost.Value;
                     Powermode();
                     if (maxenergy <= 0)
                     {
@@ -957,29 +968,58 @@ namespace nanosuit
                 }
             }           
         }
+        private void killMemu()
+        {
+            if (Input.GetMouseButtonDown(2))
+            {
+                if (gameWorld.AllPlayers.Count >= 2)
+                {
+                    for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
+                    {
+                        gameWorld.AllPlayers[i].KillMe(EBodyPart.Head, 1000f); 
+                    }
+                }
+            }           
+        }
         private void FastMemu()
         {
             if (Input.GetMouseButtonDown(2))
-            {          
-                Cursor.lockState = CursorLockMode.Confined;
-                Cursor.visible = true;
+            {
                 if (fastmemu==null)
                 {
+                    Console.WriteLine(Cursor.visible);
+                    
                     Console.WriteLine(Cursor.lockState);      
                     var fastmemubase = Instantiate(fastmemuPrefab, marktarget.transform.position, marktarget.transform.rotation);
                     fastmemu = fastmemubase as GameObject;
                 }
+            }
+            if (Input.GetMouseButton(2))
+            {
+                LockCursor = false;
             }
             if (Input.GetMouseButtonUp(2))
             {
                 if (fastmemu != null)
                 {
                     Console.WriteLine(Cursor.lockState);
+                    Console.WriteLine(Cursor.visible);
                     Cursor.lockState = CursorLockMode.Locked;
                     Destroy(fastmemu);
                 }
             }
         }
+        #region 锁定/隐藏鼠标
+        public static bool LockCursor
+        {
+            get => Cursor.lockState == CursorLockMode.Locked;
+            set
+            {
+                Cursor.visible = true;
+                Cursor.lockState = value ? CursorLockMode.Locked : CursorLockMode.Confined;
+            }
+        }
+        #endregion
         private void Destorynanohud()
         {
             if (nanovisionhud != null)
@@ -1002,26 +1042,25 @@ namespace nanosuit
         }
         private void Powermode()
         {
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity != 0.1f)
+            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity != nanosuitcore.powerweapon.Value)
             {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity = 0.1f;
+                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity = nanosuitcore.powerweapon.Value;
             }
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness != 0.1f)
+            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness != nanosuitcore.powerweapon.Value)
             {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness = 0.1f;
+                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness = nanosuitcore.powerweapon.Value;
             }
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity != 0.1f)
+            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity != nanosuitcore.powerweapon.Value)
             {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity = 0.1f;
-
+                gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity = nanosuitcore.powerweapon.Value;
             }
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.MotionReact.Intensity != 0.1f)
+            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.MotionReact.Intensity != nanosuitcore.powerweapon.Value)
             {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.MotionReact.Intensity = 0.1f;
+                gameWorld.MainPlayer.ProceduralWeaponAnimation.MotionReact.Intensity = nanosuitcore.powerweapon.Value;
             }
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.ForceReact.Intensity != 0.1f)
+            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.ForceReact.Intensity != nanosuitcore.powerweapon.Value)
             {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.ForceReact.Intensity = 0.1f;
+                gameWorld.MainPlayer.ProceduralWeaponAnimation.ForceReact.Intensity = nanosuitcore.powerweapon.Value;
             }
         }
         private void Powermodeclose()
@@ -1048,8 +1087,9 @@ namespace nanosuit
                 gameWorld.MainPlayer.ProceduralWeaponAnimation.ForceReact.Intensity = 1f;
             }
         }
-        void FixedUpdate()
+        void OnGui()
         {
+            //FastMemu();
         }
         IEnumerator CloakCharacter()
         {
@@ -1265,7 +1305,7 @@ namespace nanosuit
                 }
             }
         }
-    }
+}
 
     public class Suitleglink : MonoBehaviour
     {
@@ -1384,10 +1424,10 @@ namespace nanosuit
                     nanosuit.fixdelaytime = 0;
                     nanosuit.startfixdebuff = true;
                     nanosuit.iscureyourself = false;
-                } //350是2091；351-353是2100；355是2103
+                } //350是2091；351-353是2100；355-356是2103，357是2102
                 if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "PainKiller"))
                 {
-                    ActiveHealthControllerClass.GClass2103 nanoPainKiller = typeof(ActiveHealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthControllerClass.GClass2103;
+                    ActiveHealthControllerClass.GClass2102 nanoPainKiller = typeof(ActiveHealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthControllerClass.GClass2102;
                     if (nanoPainKiller.TimeLeft < 60) nanoPainKiller.AddWorkTime(60f, false);
                     return;
                 }
@@ -1418,5 +1458,15 @@ namespace nanosuit
                 nanosuit.maxenergy = nanosuit.maxenergy - nanosuitcore.armordefensehigh.Value;
             }
         }
-    }   
+    }
+    public class BoyNextDoor : ModulePatch
+    {
+        //踹门(Fuck the door)
+        protected override MethodBase GetTargetMethod() => typeof(Door).GetMethod("BreachSuccessRoll", BindingFlags.Instance | BindingFlags.Public);
+        [PatchPostfix]
+        static void PostFix(ref bool __result)
+        {
+            __result = true;
+        }
+    }
 }

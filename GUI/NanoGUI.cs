@@ -309,7 +309,7 @@ namespace nanosuit
                     StartCoroutine("PowerJump");
                     PowerMode.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
                     PowerMode.GetComponent<AudioSource>().Play();
-                    nanosuit.maxenergy -= 15;
+                    nanosuit.maxenergy -= nanosuitcore.powerjumpcost.Value;
                 }   
             }
         }
