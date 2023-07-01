@@ -47,9 +47,9 @@ namespace nanosuit
         public Color EnergyColorbase;
         public static bool befound;
         public static bool ready;
+        public static bool isweapon;
         private float timeFade;
         private float jumpFade;
-        private bool isweapon;
         private Weapon NowWeapon;
         private static Player NanoPlayer;
         private Player.FirearmController NowFirearmController;
@@ -63,7 +63,8 @@ namespace nanosuit
             isweapon = false;
             timeFade = 0f;
             jumpFade = Physics.gravity.y;
-            new NanoWaring().Enable();//启动AI警告    
+            new NanoWaring().Enable();//启动AI警告
+            //new NanoSpeedPatch().Enable();
         }
 
         // Update is called once per frame
@@ -95,8 +96,8 @@ namespace nanosuit
                     if (NowItemController.Template.UnlootableFromSlot == "FirstPrimaryWeapon" && NowItemController.Template._parent != "543be6564bdc2df4348b4568")
                     {
                         //Console.WriteLine(NanoPlayer.MovementContext.MaxSpeed);
-                        MovementState.G = new Vector3(0, -6, 0);
-                        isweapon = true;
+                        //MovementState.G = new Vector3(0, -6, 0);
+                        isweapon = true;                       
                     }
                     if (NowItemController.Template._parent == "543be6564bdc2df4348b4568")
                     {
@@ -199,6 +200,7 @@ namespace nanosuit
             if (NormalMode != null)
             {
                 basepack.GetComponent<RectTransform>().anchoredPosition = new Vector3(nanosuitcore.Xzhou.Value, nanosuitcore.Yzhou.Value, 0);
+                basepack.GetComponent<RectTransform>().eulerAngles = new Vector3(nanosuitcore.Xzhouxuan.Value, nanosuitcore.Yzhouxuan.Value, nanosuitcore.Zzhouxuan.Value);
                 if (nanosuit.isfly)
                 {
                     FlyMode.GetComponent<RawImage>().enabled = true;
@@ -223,7 +225,12 @@ namespace nanosuit
                     Closemode();
                     PowerMode.GetComponent<RawImage>().enabled = true;
                 }
-                if (!nanosuit.isstealth && !nanosuit.isarmor && !nanosuit.ispower)
+                if (nanosuit.isspeed)
+                {
+                    Closemode();
+                    SpeedMode.GetComponent<RawImage>().enabled = true;
+                }
+                if (!nanosuit.isstealth && !nanosuit.isarmor && !nanosuit.ispower&&!nanosuit.isspeed)
                 {
                     Closemode();
                     NormalMode.GetComponent<RawImage>().enabled = true;
@@ -373,13 +380,16 @@ namespace nanosuit
             CoolTime = Time.time + 3f;
         }
     }
-    //[HarmonyPatch(typeof(Player), "MaxSpeed", MethodType.Setter)]
-    //class NanoSpeedPatch
-    //{
-    //    public static bool Prefix(ref float MaxSpeed)
-    //    {
-    //        MaxSpeed = 100f;
-    //        return false; //拦截原方法，直接使用我们给出的结果
-    //    }
-    //}
+    //[HarmonyPatch(typeof(Player), "MaxSpeed", MethodType.Getter)]
+
+    public class NanoSpeedPatch : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod() => typeof(GClass1604).GetMethod("MovementContext", BindingFlags.Instance | BindingFlags.Public);
+        [PatchPrefix]
+        public static bool Prefix(Player __instance, ref float MaxSpeed)
+        {
+            MaxSpeed = 100f;
+            return false; //拦截原方法，直接使用我们给出的结果
+        }
+    }
 }

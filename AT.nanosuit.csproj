@@ -115,12 +115,15 @@
   <ItemGroup>
     <Compile Include="Broadcast\NanoBroadcast.cs" />
     <Compile Include="GUI\NanoGUI.cs" />
+    <Compile Include="itemslink\armorhit.cs" />
+    <Compile Include="itemslink\Suitleglink.cs" />
+    <Compile Include="itemslink\weaponlink.cs" />
     <Compile Include="minimap\NanoMimiradarenemy.cs" />
     <Compile Include="minimap\NanoMiniMapCompass.cs" />
     <Compile Include="minimap\NanoMimiradarplayer.cs" />
     <Compile Include="nanosuit.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="weaponlink\gausslink.cs" />
+    <Compile Include="itemslink\gausslink.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
