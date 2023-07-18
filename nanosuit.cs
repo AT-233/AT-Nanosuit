@@ -18,16 +18,19 @@ using UnityEngine.UI;
 
 namespace nanosuit
 {
-    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "1.1.1.3")]
+    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "2.0.0.0")]
     public class nanosuitcore : BaseUnityPlugin
     {
         // 窗口开关
+        private static GameWorld gameWorld;
         private static ManualLogSource logger;
         public static ConfigEntry<int> armorcost;
         public static ConfigEntry<int> armordefenselow;
         public static ConfigEntry<int> armordefensehigh;
         public static ConfigEntry<float> stealthcost;
         public static ConfigEntry<float> stealthcostmove;
+        public static ConfigEntry<float> speedcostrun;
+        public static ConfigEntry<float> speedupbase;
         public static ConfigEntry<int> flycost;
         public static ConfigEntry<int> fuckdoorcost;
         public static ConfigEntry<int> quickgrenadecost;
@@ -65,6 +68,11 @@ namespace nanosuit
         public static ConfigEntry<float> FixIntensity;
         public static string[] nanouplist = { "无(Null)", "生存强化(Enhanced Survival)", "自动装甲(Auto Armor)", "能量吸收(Energy absorption)" };
         public static string[] languagelist = { "二代男声(V2.0male)", "一代男声(V1.0male)", "一代女声(V1.0female)" };
+        public static BindingFlags BFlags = BindingFlags.NonPublic
+                                            | BindingFlags.Public
+                                            | BindingFlags.Instance
+                                            | BindingFlags.DeclaredOnly
+                                            | BindingFlags.Static;
         public void Awake()
         {
             var harmony = new Harmony("nanosuit");
@@ -85,8 +93,10 @@ namespace nanosuit
             powerjumpcost = Config.Bind<float>("力量模式配置(Power Settings)", "力量跳跃消耗(Power Jump Cost)", 15, "力量模式下每次跳跃消耗的能量(Energy cost per jump in Power Mode)");
             powerweapon = Config.Bind("力量模式配置(Power Settings)", "力量后座(Power Recoil)", 0.1f, new ConfigDescription("力量模式下的武器后座力(Weapon recoil in Power mode)", new AcceptableValueRange<float>(0f, 1f)));
             speedcost = Config.Bind<float>("速度模式配置(Speed Settings)", "速度消耗(Speed Cost)", 0.5f, "速度模式下能量自然消耗每秒的值(Natural energy cost per second in Speed mode)");
-            speedratio = Config.Bind<float>("速度模式配置(Speed Settings)", "武器速度倍率(Speed Ratio)", 1.8f, "速度模式下武器使用速度倍率(Speed Ratio for weapon use in Speed mode)");
+            speedratio = Config.Bind<float>("速度模式配置(Speed Settings)", "武器使用速度倍率(Weapon use speed Ratio)", 1.8f, "速度模式下武器使用速度倍率(Speed Ratio for weapon use in Speed mode)");
             quickgrenadecost = Config.Bind<int>("速度模式配置(Speed Settings)", "快速丢雷消耗(QuickGrenade Cost)", 3, "速度模式下丢雷一次消耗能量(Energy cost quick throw grenade in Speed mode)");
+            speedcostrun = Config.Bind<float>("速度模式配置(Speed Settings)", "奔跑消耗(Running Cost)", 30, "速度模式下奔跑消耗的能量(Energy cost when running in Speed mode)");
+            speedupbase = Config.Bind<float>("速度模式配置(Speed Settings)", "移动速度倍率(Moving Ratio)", 1.2f, "速度模式下移动速度倍率(Speed Ratio for moving in Speed mode)");
             nanocharg = Config.Bind<int>("充能配置(Charge Settings)", "充能速率(Charging Speed)", 25, "纳米服每秒充能速率(Nanosuit charge rate per second)");
             nanochargdelay = Config.Bind<int>("充能配置(Charge Settings)", "充能延迟(Charging Delay)", 2, "纳米服关闭功能后延迟几秒后开始充能(Turn off the function after a delay of a few seconds to start charging)");           
             nanoup = Config.Bind<string>("强化方案选择(Enhanced Choose)", "根据你的战斗习惯选择不同的强化方案(Depending on your combat habits, choose different Enhanced programs)", nanouplist[1], 
@@ -115,10 +125,19 @@ namespace nanosuit
             FixIntensity = Config.Bind("自动修复系统设置(Automatic Treatment System Settings)", "修复速度(Treatment Rate)", 0.1f, new ConfigDescription("触发自动修复后的修复速率(Rate of Treatment after Automatic Treatment is triggered)", new AcceptableValueRange<float>(0f, 1f)));
             FixDelay = Config.Bind<int>("自动修复系统设置(Automatic Treatment System Settings)", "修复延迟(Treatment Delay)", 10, "收到伤害后延迟几秒后开始自动修复(After receiving damage delay of a few seconds, Automatic Treatment begins)");
         }
+        void Start()
+        {
+            
+        }
         void Update()
+        {
+           
+        }
+        void LateUpdate()
         {
 
         }
+
         [HarmonyPatch(typeof(GClass2624), "HitCollider", MethodType.Getter)]
         public class NanosuitClockMode
         {
@@ -162,6 +181,7 @@ namespace nanosuit
         private Color cloakColor = Color.white;
         private Color ArmorColor = Color.white;
         public static float maxenergy = 100;
+        public static float speeduprunbase = 2f;
         public static int nowenergy;
         //private ArmorComponent armor;
         private int armorvoice;
@@ -245,13 +265,21 @@ namespace nanosuit
             isarmorfov = false;
             islowpower = false;
             isfirstlowpower = false;
-            oldknifeskill = 1;           
+            oldknifeskill = 1;
+            isstealth = false;
+            isarmor = false;
+            ispower = false;
+            isspeed = false;
+            gameWorld = Singleton<GameWorld>.Instance;
             AItarget = new GameObject[999];
             AIhealth = new bool[999];
             new ArmormodePatch().Enable();
             new FastWeapon().Enable();
             new BoyNextDoor().Enable();
             new FastGrenade().Enable();
+            new speedupcore().Enable();
+            new speedmode().Enable();
+            new speeduplink().Enable();
             newmaterial = new Material[Hand.GetComponent<SkinnedMeshRenderer>().materials.Length];//替换材质只能这样搞
             for (int i = 0; i < newmaterial.Length; i++)//获取物体全部材质
             {
@@ -289,11 +317,10 @@ namespace nanosuit
                 NowFov = CameraClass.Instance.Fov;
                 //FastMemu();
                 //killMemu();
-                testmode();
+                //testmode();
                 energywaring();
                 nowenergy = (int)maxenergy;
-                this.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;//纳米系统音量调整
-                gameWorld = Singleton<GameWorld>.Instance;               
+                this.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;//纳米系统音量调整                               
                 if (nanosuitcore.nanoup.Value == "生存强化(Enhanced Survival)")
                 {
                     if (startfixdebuff && Entermap()&& nanosuitcore.curemodeOnline.Value)
@@ -483,14 +510,10 @@ namespace nanosuit
                     isfirstarmor = true;
                     Destorynanohud();
                     SearchSpeedUpClose();
-                    if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") this.GetComponent<AudioSource>().clip = audios[armorvoice];
-                    if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") this.GetComponent<AudioSource>().clip = audiosman[armorvoice];
-                    if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") this.GetComponent<AudioSource>().clip = audioswoman[armorvoice];
+                    Nanovoiceset(armorvoice);
                     if (isautoarmor && nanosuitcore.nanoup.Value == "自动装甲(Auto Armor)") 
                     {
-                        if (isautoarmor && nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") this.GetComponent<AudioSource>().clip = audios[7];
-                        if (isautoarmor && nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") this.GetComponent<AudioSource>().clip = audiosman[7];
-                        if (isautoarmor && nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") this.GetComponent<AudioSource>().clip = audioswoman[7];
+                        Nanovoiceset(7);
                     }
                     isautoarmor = false;
                     this.GetComponent<AudioSource>().Play();
@@ -537,9 +560,7 @@ namespace nanosuit
                     Destorynanohud();
                     CloseCameraArmorFov();
                     SearchSpeedUpClose();
-                    if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") {this.GetComponent<AudioSource>().clip = audios[stealthvoice]; }
-                    if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") {this.GetComponent<AudioSource>().clip = audiosman[stealthvoice]; }
-                    if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") {this.GetComponent<AudioSource>().clip = audioswoman[stealthvoice]; }
+                    Nanovoiceset(stealthvoice);
                     //this.GetComponent<AudioSource>().clip = audios[stealthvoice];
                     this.GetComponent<AudioSource>().Play();
                     newmaterial[0] = stealthmaterial;
@@ -584,9 +605,7 @@ namespace nanosuit
                         }
                         nanovisionhud.transform.parent = marktarget.transform;
                     }
-                    if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") { this.GetComponent<AudioSource>().clip = audios[powervoice]; }
-                    if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") { this.GetComponent<AudioSource>().clip = audiosman[powervoice]; }
-                    if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") { this.GetComponent<AudioSource>().clip = audioswoman[powervoice]; }
+                    Nanovoiceset(powervoice);
                     //this.GetComponent<AudioSource>().clip = audios[powervoice];
                     this.GetComponent<AudioSource>().Play();
                     newmaterial[0] = powermaterial;
@@ -632,9 +651,7 @@ namespace nanosuit
                         nanovisionhud = nanovisionhudbase as GameObject;
                         nanovisionhud.transform.parent = marktarget.transform;
                     }
-                    if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") { this.GetComponent<AudioSource>().clip = audios[speedvoice]; }
-                    if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") { this.GetComponent<AudioSource>().clip = audiosman[speedvoice]; }
-                    if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") { this.GetComponent<AudioSource>().clip = audioswoman[speedvoice]; }
+                    Nanovoiceset(speedvoice);
                     //this.GetComponent<AudioSource>().clip = audios[powervoice];
                     this.GetComponent<AudioSource>().Play();
                     newmaterial[0] = speedmaterial;
@@ -644,6 +661,8 @@ namespace nanosuit
                     powervoice = 5;
                     armorvoice = 0;
                     stealthvoice = 2;
+                     
+                     
                     if (speedvoice >= 11)//速度模式是否关闭
                     {
                         SearchSpeedUpClose();
@@ -675,9 +694,7 @@ namespace nanosuit
                     isnanovision = !isnanovision;
                     if (isnanovision)//判断现在是否纳米视野
                     {
-                        if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") {this.GetComponent<AudioSource>().clip = audios[4]; }
-                        if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)"){ this.GetComponent<AudioSource>().clip = audiosman[4]; }
-                        if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") {this.GetComponent<AudioSource>().clip = audioswoman[4]; }
+                        Nanovoiceset(4);
                         //this.GetComponent<AudioSource>().clip = audios[4];
                         this.GetComponent<AudioSource>().Play();
                         Destorynanohud();
@@ -973,26 +990,10 @@ namespace nanosuit
                         isenergyempty = false;
                     }
                 }
-                if (isstealth)//隐身模式能量自然消耗
-                {
-                    cloakcost();
-                    ischarging = false;
-                    if (maxenergy <= 0)
-                    {
-                        maxenergy = 0;
-                        energytimer = 0;
-                        isenergyempty = true;
-                    }
-                    if (gameWorld.MainPlayer.ActiveHealthController.DamageCoeff != 1f && Entermap())
-                    {
-                        gameWorld.MainPlayer.ActiveHealthController.SetDamageCoeff(1f);
-                    }
-                    CloseCameraClassEffects();
-                }
                 if (isarmor)//装甲模式参数设置
                 {
                     maxenergy -= Time.deltaTime * nanosuitcore.armorcost.Value;
-                    ischarging = false;                                       
+                    ischarging = false;
                     if (maxenergy <= 0)
                     {
                         maxenergy = 0;
@@ -1011,19 +1012,35 @@ namespace nanosuit
                     }
                     if (nanoarmorhud != null && youarehit)
                     {
-                       nanoarmorhud.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
-                       nanoarmorhud.GetComponent<AudioSource>().Play();
-                       youarehit = false;
+                        nanoarmorhud.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
+                        nanoarmorhud.GetComponent<AudioSource>().Play();
+                        youarehit = false;
                     }
-                    if (gameWorld.MainPlayer.ActiveHealthController.DamageCoeff != -1f)
-                    {
-                        gameWorld.MainPlayer.ActiveHealthController.SetDamageCoeff(-1f);
-                    }
+                    //if (gameWorld.MainPlayer.ActiveHealthController.DamageCoeff != -1f)
+                    //{
+                    //    gameWorld.MainPlayer.ActiveHealthController.SetDamageCoeff(-1f);
+                    //}
                     if (gameWorld.MainPlayer.Physical.Stamina.Current < 75)
                     {
                         gameWorld.MainPlayer.Physical.Stamina.Current = gameWorld.MainPlayer.Physical.Stamina.TotalCapacity.Value;
                     }
                 }
+                if (isstealth)//隐身模式能量自然消耗
+                {
+                    cloakcost();
+                    ischarging = false;
+                    if (maxenergy <= 0)
+                    {
+                        maxenergy = 0;
+                        energytimer = 0;
+                        isenergyempty = true;
+                    }
+                    if (gameWorld.MainPlayer.ActiveHealthController.DamageCoeff != 1f && Entermap())
+                    {
+                        gameWorld.MainPlayer.ActiveHealthController.SetDamageCoeff(1f);
+                    }
+                    CloseCameraClassEffects();
+                }                
                 if(ispower)//力量模式设置
                 {
                     ischarging = false;
@@ -1040,7 +1057,19 @@ namespace nanosuit
                 {
                     ischarging = false;
                     maxenergy -= Time.deltaTime * nanosuitcore.speedcost.Value;
-                    MoveSpeedUp();                   
+                    MoveSpeedUp();
+                    //if (speedupbase != 1.2f)
+                    //{
+                    //    speedupbase = 1.2f;
+                    //}
+                    if (gameWorld.MainPlayer.IsSprintEnabled)
+                    {
+                        maxenergy -= Time.deltaTime * nanosuitcore.speedcostrun.Value;
+                        //if(speedupbase!=2f)
+                        //{
+                        //    speedupbase = 2;
+                        //}
+                    }
                     if (maxenergy <= 0)
                     {
                         maxenergy = 0;
@@ -1097,7 +1126,13 @@ namespace nanosuit
                 }
             }           
         }
-        private void energywaring()
+        private void Nanovoiceset(int x)
+        {
+            if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") { this.GetComponent<AudioSource>().clip = audios[x]; }
+            if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") { this.GetComponent<AudioSource>().clip = audiosman[x]; }
+            if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") { this.GetComponent<AudioSource>().clip = audioswoman[x]; }
+        }
+            private void energywaring()
         {
             if (maxenergy<=20 && !isfirstlowpower)
             {
@@ -1110,9 +1145,7 @@ namespace nanosuit
             }
             if (islowpower)
             {
-                if (nanosuitcore.nanovoice.Value == "二代男声(V2.0male)") this.GetComponent<AudioSource>().clip = audios[8];
-                if (nanosuitcore.nanovoice.Value == "一代男声(V1.0male)") this.GetComponent<AudioSource>().clip = audiosman[8];
-                if (nanosuitcore.nanovoice.Value == "一代女声(V1.0female)") this.GetComponent<AudioSource>().clip = audioswoman[8];
+                Nanovoiceset(8);
                 this.GetComponent<AudioSource>().Play();
                 islowpower = false;
             }
@@ -1170,14 +1203,7 @@ namespace nanosuit
         {
             if (Input.GetMouseButtonDown(2))
             {
-                //Console.WriteLine(gameWorld.MainPlayer.MovementContext.SmoothedCharacterMovementSpeed);
-                //Console.WriteLine("MAXSPEED" + gameWorld.MainPlayer.MovementContext.MaxSpeed);
-                //Console.WriteLine(Singleton<BackendConfigSettingsClass>.Instance.WalkSpeed);
-                if (CameraClass.Instance != null)
-                {
-                    //CameraClass.Instance.SetFov(FOV.Value, 0f, true);
-                    Console.WriteLine(CameraClass.Instance.Fov);
-                }
+                Console.WriteLine(gameWorld.MainPlayer.IsSprintEnabled);
             }
 
         }
@@ -1323,9 +1349,15 @@ namespace nanosuit
                 gameWorld.MainPlayer.Skills.AttentionEliteLuckySearch.Value = 0.2f;
             }
         }
-        void OnGui()
+        void LateUpdate()
         {
-            //FastMemu();
+            if(isarmor)
+            {
+                if (gameWorld.MainPlayer.ActiveHealthController.DamageCoeff != -1f)
+                {
+                    gameWorld.MainPlayer.ActiveHealthController.SetDamageCoeff(-1f);
+                }
+            }   
         }
         IEnumerator CloakCharacter()
         {
@@ -1378,23 +1410,30 @@ namespace nanosuit
         IEnumerator ArmorHit()
         {
             float ArmorColorhit = 1f;
-            //float ArmorFade = 0f;
-            ArmorColor.r = 1f;
-            ArmorColor.g = 1f;
-            ArmorColor.b = 1f;
+            float ArmorFade = 0f;
+            ArmorColor.r = ArmorFade;
+            ArmorColor.g = ArmorFade;
+            ArmorColor.b = 1;
             if (nanoarmorhud != null)
             {
                 RawImage[] armorhudMeshRenderer = nanoarmorhud.GetComponentsInChildren<RawImage>();
                 foreach (RawImage child in armorhudMeshRenderer)
                 {
                     armorhudMeshRenderer[0].color = ArmorColor;
-                    while (ArmorColorhit > nanosuitcore.ArmorhudAlpha.Value)
+                    while (ArmorFade < 1f && ArmorColorhit > nanosuitcore.ArmorhudAlpha.Value)
                     {
-                        ArmorColorhit -= 0.05f;
+                        ArmorFade += 0.3f;
+                        if (ArmorFade >= 1)
+                        {
+                            ArmorFade = 1;
+                        }
+                        ArmorColorhit -= 0.1f;
                         if (ArmorColorhit <= nanosuitcore.ArmorhudAlpha.Value)
                         {
                             ArmorColorhit = nanosuitcore.ArmorhudAlpha.Value;
                         }
+                        ArmorColor.g = ArmorFade;
+                        ArmorColor.r = ArmorFade;
                         ArmorColor.a = ArmorColorhit;
                         armorhudMeshRenderer[0].color = ArmorColor;
                         yield return 0;
@@ -1442,7 +1481,7 @@ namespace nanosuit
     public class NanosuitPatch : ModulePatch
     {
         //搜索EFT空间下的Player类里的ReceiveDamage
-        protected override MethodBase GetTargetMethod() => typeof(Player).GetMethod("ReceiveDamage", BindingFlags.Instance | BindingFlags.NonPublic);
+        protected override MethodBase GetTargetMethod() => typeof(Player).GetMethod("ReceiveDamage", nanosuitcore.BFlags);
 
         [PatchPostfix]
         static void PostFix(ref Player __instance, EDamageType type)
@@ -1470,7 +1509,7 @@ namespace nanosuit
     public class ArmormodePatch : ModulePatch
     {
         //搜索EFT空间下的Player类里的ReceiveDamage
-        protected override MethodBase GetTargetMethod() => typeof(Player).GetMethod("ReceiveDamage", BindingFlags.Instance | BindingFlags.NonPublic);
+        protected override MethodBase GetTargetMethod() => typeof(Player).GetMethod("ReceiveDamage", nanosuitcore.BFlags);
 
         [PatchPostfix]
         static void PostFix(ref Player __instance, EDamageType type)
@@ -1492,7 +1531,7 @@ namespace nanosuit
     public class BoyNextDoor : ModulePatch
     {
         //踹门(Fuck the door)
-        protected override MethodBase GetTargetMethod() => typeof(Door).GetMethod("BreachSuccessRoll", BindingFlags.Instance | BindingFlags.Public);
+        protected override MethodBase GetTargetMethod() => typeof(Door).GetMethod("BreachSuccessRoll", nanosuitcore.BFlags);
         [PatchPostfix]
         static void PostFix(ref bool __result)
         {
@@ -1511,7 +1550,7 @@ namespace nanosuit
         }
 
         [PatchPrefix]
-        static void Prefix(Player __instance, GrenadeClass throwWeap, Callback<GInterface117> callback)
+        static void Prefix(Player __instance, GrenadeClass throwWeap, Callback<GInterface116> callback)
         {
             if(__instance.IsYourPlayer&&nanosuit.isspeed)
             {
@@ -1522,7 +1561,7 @@ namespace nanosuit
     }
     public class FastWeapon : ModulePatch //武器加速(weapon speed up)
     {
-        protected override MethodBase GetTargetMethod() => typeof(ObjectInHandsAnimator).GetMethod("SetAnimationSpeed", BindingFlags.Instance | BindingFlags.Public);
+        protected override MethodBase GetTargetMethod() => typeof(ObjectInHandsAnimator).GetMethod("SetAnimationSpeed", nanosuitcore.BFlags);
         [PatchPrefix]
         static void Prefix(object __instance, ref float speed)
         {
@@ -1530,10 +1569,65 @@ namespace nanosuit
             {
                 speed *= nanosuitcore.speedratio.Value;
             }
-            if (!nanosuit.isspeed)
+        }
+    }
+    public class speedupcore : ModulePatch
+    {
+        public static Vector3 _motion;
+
+        protected override MethodBase GetTargetMethod() => typeof(SimpleCharacterController).GetMethod("Move", nanosuitcore.BFlags);
+
+        [PatchPrefix]
+        static void Prefix(SimpleCharacterController __instance, Vector3 ___vector3_1, Vector3 motion, float deltaTime)
+        {
+
+            Player p = __instance.GetComponentInParent<Player>();
+            if (p != null && p.IsYourPlayer)
             {
-                speed *= 1.2f;
+                _motion = motion;
             }
+        }
+    }
+
+    public class speedmode : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod() => typeof(SimpleCharacterController).GetMethod("method_18", nanosuitcore.BFlags);
+
+        [PatchPrefix]
+        static bool Prefix(SimpleCharacterController __instance, ref Vector3 __result, Vector3 point)
+        {
+            Player p = __instance.GetComponentInParent<Player>();
+            if (p != null && p.IsYourPlayer)
+            {
+                if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D)) && nanosuit.isspeed)
+                {
+                    var tmp_x = speedupcore._motion.x * nanosuitcore.speedupbase.Value;
+                    var tmp_y = 0.02f;
+                    var tmp_z = speedupcore._motion.z * nanosuitcore.speedupbase.Value;
+                    __result = point + new Vector3(tmp_x, tmp_y, tmp_z);
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+    public class speeduplink : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod() => typeof(SimpleCharacterController).GetMethod("method_1", nanosuitcore.BFlags);
+
+        [PatchPrefix]
+        static bool Prefix(SimpleCharacterController __instance, Vector3 startPosition, float deltaTime)
+        {
+
+            Player p = __instance.GetComponentInParent<Player>();
+            if (p != null && p.IsYourPlayer)
+            {
+                if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D)) && nanosuit.isspeed)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 }

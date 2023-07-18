@@ -13,6 +13,7 @@ namespace nanosuit
 {
     public class NanoGUI : MonoBehaviour
     {
+        public AudioClip[] nanoaudios;
         public RawImage NormalMode;
         public RawImage AmorMode;
         public RawImage CloakMode;
@@ -48,6 +49,8 @@ namespace nanosuit
         public static bool befound;
         public static bool ready;
         public static bool isweapon;
+        public static bool firstspeed;
+        public static bool firstrunning;
         private float timeFade;
         private float jumpFade;
         private Weapon NowWeapon;
@@ -61,6 +64,8 @@ namespace nanosuit
             befound = false;
             ready = true;
             isweapon = false;
+            firstrunning = false;
+            firstspeed = false;
             timeFade = 0f;
             jumpFade = Physics.gravity.y;
             new NanoWaring().Enable();//启动AI警告
@@ -319,6 +324,42 @@ namespace nanosuit
                     nanosuit.maxenergy -= nanosuitcore.powerjumpcost.Value;
                 }   
             }
+            if (nanosuit.isspeed)
+            {
+                if (NanoPlayer.IsSprintEnabled && !firstspeed)
+                {
+                    SpeedMode.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
+                    SpeedMode.GetComponent<AudioSource>().clip = nanoaudios[0];
+                    SpeedMode.GetComponent<AudioSource>().loop = true;
+                    SpeedMode.GetComponent<AudioSource>().Play();
+                    firstspeed = true;
+                }
+                if (!NanoPlayer.IsSprintEnabled && firstspeed)
+                {
+                    firstrunning = true;
+                }
+                if (firstspeed && firstrunning)
+                {
+                    SpeedMode.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
+                    SpeedMode.GetComponent<AudioSource>().clip = nanoaudios[1];
+                    SpeedMode.GetComponent<AudioSource>().loop = false;
+                    SpeedMode.GetComponent<AudioSource>().Play(); 
+                    firstspeed = false;
+                    firstrunning = false;
+                }
+            }
+            if (!nanosuit.isspeed)
+            {
+                if(firstspeed)
+                {
+                    SpeedMode.GetComponent<AudioSource>().volume = nanosuitcore.nanovolume.Value;
+                    SpeedMode.GetComponent<AudioSource>().clip = nanoaudios[0];
+                    SpeedMode.GetComponent<AudioSource>().loop = false;
+                    SpeedMode.GetComponent<AudioSource>().Stop();
+                    firstspeed = false;
+                    firstrunning = false;
+                }  
+            }
         }
         private void Closeui()
         {
@@ -388,7 +429,7 @@ namespace nanosuit
         [PatchPrefix]
         public static bool Prefix(Player __instance, ref float MaxSpeed)
         {
-            MaxSpeed = 100f;
+            MaxSpeed = 1.8f;
             return false; //拦截原方法，直接使用我们给出的结果
         }
     }

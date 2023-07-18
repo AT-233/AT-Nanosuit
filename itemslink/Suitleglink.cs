@@ -20,6 +20,7 @@ namespace nanosuit
                 suitlegmaterial[i] = this.GetComponent<SkinnedMeshRenderer>().materials[i];
             }
             suitlegmaterial[0] = basematerial;//ÉèÖÃÄ¬ÈÏ²ÄÖÊ
+            this.GetComponent<SkinnedMeshRenderer>().materials = suitlegmaterial;
             iscloak = false;
         }
         void Update()

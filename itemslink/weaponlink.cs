@@ -19,6 +19,7 @@ namespace nanosuit
                 weaponmaterial[i] = this.GetComponent<MeshRenderer>().materials[i];
             }
             weaponmaterial[0] = basematerial;//ÉèÖÃÄ¬ÈÏ²ÄÖÊ
+            this.GetComponent<MeshRenderer>().materials = weaponmaterial;
         }
         void Update()
         {
