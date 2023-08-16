@@ -138,10 +138,10 @@ namespace nanosuit
 
         }
 
-        [HarmonyPatch(typeof(GClass2624), "HitCollider", MethodType.Getter)]
+        [HarmonyPatch(typeof(GClass2765), "HitCollider", MethodType.Getter)]
         public class NanosuitClockMode
         {
-            public static void Postfix(GClass2624 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624
+            public static void Postfix(GClass2765 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2765
             {
                 var hitman = __instance.Player;//获取是谁射的子弹
                 if (__result != null)
@@ -149,7 +149,7 @@ namespace nanosuit
                     var cloakhitScript = __result.GetComponentInParent<armorhit>();
                     if (cloakhitScript != null)
                     {
-                        cloakhitScript.cloakhit_method(hitman.IsYourPlayer);
+                        cloakhitScript.cloakhit_method(!hitman.IsAI);
                     }
                 }
             }
@@ -250,7 +250,7 @@ namespace nanosuit
         public static Object fastmemuPrefab { get; private set; }
         // Start is called before the first frame update
         public static bool Entermap() => Singleton<GameWorld>.Instantiated;
-        //public static bool Entermap() => Singleton<GameWorld>.Instantiated && gameWorld.AllPlayers != null && gameWorld.AllPlayers.Count > 0 && gameWorld.MainPlayer.IsYourPlayer;
+        //public static bool Entermap() => Singleton<GameWorld>.Instantiated && gameWorld.AllAlivePlayersList != null && gameWorld.AllAlivePlayersList.Count > 0 && gameWorld.MainPlayer.IsYourPlayer;
         void Start()
         {
             BaseFov = CameraClass.Instance.Fov;
@@ -714,13 +714,13 @@ namespace nanosuit
                             var minimapbase = Instantiate(minimapPrefab);
                             minimap = minimapbase as GameObject;
                         }
-                        if (Entermap() && gameWorld.AllPlayers.Count >= 2)
+                        if (Entermap() && gameWorld.AllAlivePlayersList.Count >= 2)
                         {
-                            for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
+                            for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
                             {
-                                //Console.WriteLine("读取坐标" + gameWorld.AllPlayers[i].Transform.position);
+                                //Console.WriteLine("读取坐标" + gameWorld.AllAlivePlayersList[i].Transform.position);
                                 //Console.WriteLine(i);
-                                AItarget[i] = Instantiate(nanotargetPrefab, gameWorld.AllPlayers[i].Transform.position, gameWorld.AllPlayers[i].Transform.rotation) as GameObject;
+                                AItarget[i] = Instantiate(nanotargetPrefab, gameWorld.AllAlivePlayersList[i].Transform.position, gameWorld.AllAlivePlayersList[i].Transform.rotation) as GameObject;
                             }
                         }
                     }
@@ -1100,18 +1100,18 @@ namespace nanosuit
                     }                                    
                     if (!isenergyempty)
                     {
-                        if (gameWorld.AllPlayers.Count >= 2)
+                        if (gameWorld.AllAlivePlayersList.Count >= 2)
                         {
-                            for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
+                            for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
                             {
-                                AIhealth[i] = gameWorld.AllPlayers[i].HealthController.IsAlive;
+                                AIhealth[i] = gameWorld.AllAlivePlayersList[i].HealthController.IsAlive;
                                 if (!AIhealth[i])
                                 {
                                     Destroy(AItarget[i]);
                                 }
                                 if (AItarget[i] != null && AIhealth[i])
                                 {
-                                    AItarget[i].transform.position = gameWorld.AllPlayers[i].Transform.position;
+                                    AItarget[i].transform.position = gameWorld.AllAlivePlayersList[i].Transform.position;
                                 }
                             }
                         }
@@ -1190,11 +1190,11 @@ namespace nanosuit
         {
             if (Input.GetMouseButtonDown(2))
             {
-                if (gameWorld.AllPlayers.Count >= 2)
+                if (gameWorld.AllAlivePlayersList.Count >= 2)
                 {
-                    for (int i = 1; i < gameWorld.AllPlayers.Count; i++)//获取全部AI
+                    for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
                     {
-                        gameWorld.AllPlayers[i].KillMe(EBodyPart.Head, 1000f); 
+                        gameWorld.AllAlivePlayersList[i].KillMe(EBodyPart.Head, 1000f); 
                     }
                 }
             }           
@@ -1493,16 +1493,16 @@ namespace nanosuit
                     nanosuit.fixdelaytime = 0;
                     nanosuit.startfixdebuff = true;
                     nanosuit.iscureyourself = false;
-                } //350是2091；351-353是2100；355-356是2103，357是2102
+                } //350是2091；351-353是2100；355-356是2103，357是2102，360是2327，370是2227
                 if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "PainKiller"))
                 {
-                    ActiveHealthControllerClass.GClass2102 nanoPainKiller = typeof(ActiveHealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthControllerClass.GClass2102;
-                    if (nanoPainKiller.TimeLeft < 60) nanoPainKiller.AddWorkTime(60f, false);
+                    HealthControllerClass.GClass2227 nanoPainKiller = typeof(HealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(HealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as HealthControllerClass.GClass2227;
+                    if (nanoPainKiller.TimeLeft < 60) nanoPainKiller.AddWholeTime(60f);
                     return;
                 }
 
-                MethodInfo method = typeof(ActiveHealthControllerClass).GetMethod("method_15", BindingFlags.Instance | BindingFlags.NonPublic);
-                method.MakeGenericMethod(typeof(ActiveHealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, 0f, 60f, 0f, 1f, null });               
+                MethodInfo method = typeof(HealthControllerClass).GetMethod("method_15", BindingFlags.Instance | BindingFlags.NonPublic);
+                method.MakeGenericMethod(typeof(HealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, 0f, 60f, 0f, 1f, null });               
             }
         }
     }
