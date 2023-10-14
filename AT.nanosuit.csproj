@@ -31,8 +31,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="%28358%29Assembly-CSharp">
-      <HintPath>..\(358)Assembly-CSharp.dll</HintPath>
+    <Reference Include="%28370%29Assembly-CSharp">
+      <HintPath>..\(370)Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="0Harmony">
@@ -115,6 +115,7 @@
   <ItemGroup>
     <Compile Include="Broadcast\NanoBroadcast.cs" />
     <Compile Include="GUI\NanoGUI.cs" />
+    <Compile Include="GUI\NanoGUI2.cs" />
     <Compile Include="itemslink\armorhit.cs" />
     <Compile Include="itemslink\Suitleglink.cs" />
     <Compile Include="itemslink\weaponlink.cs" />
@@ -125,6 +126,8 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="itemslink\gausslink.cs" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="suitmode\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

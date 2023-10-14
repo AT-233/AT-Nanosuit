@@ -1,6 +1,7 @@
 ﻿using Aki.Reflection.Patching;
 using Comfort.Common;
 using EFT;
+using EFT.HealthSystem;
 using System;
 using System.Reflection;
 using UnityEngine;
@@ -49,8 +50,8 @@ namespace nanosuit
         public static bool befound;
         public static bool ready;
         public static bool isweapon;
-        public static bool firstspeed;
-        public static bool firstrunning;
+        private static bool firstspeed;
+        private static bool firstrunning;
         private float timeFade;
         private float jumpFade;
         private Weapon NowWeapon;
@@ -81,8 +82,7 @@ namespace nanosuit
                 if (NanoPlayer == null)
                 {
                     NanoPlayer = gameWorld.MainPlayer;
-                    Console.WriteLine("玩家正常");
-                    
+                    Console.WriteLine("玩家正常");  
                 }
                 if (isweapon && NanoPlayer != null && NanoPlayer.HandsController != null)
                 {
@@ -100,8 +100,6 @@ namespace nanosuit
                 {
                     if (NowItemController.Template.UnlootableFromSlot == "FirstPrimaryWeapon" && NowItemController.Template._parent != "543be6564bdc2df4348b4568")
                     {
-                        //Console.WriteLine(NanoPlayer.MovementContext.MaxSpeed);
-                        //MovementState.G = new Vector3(0, -6, 0);
                         isweapon = true;                       
                     }
                     if (NowItemController.Template._parent == "543be6564bdc2df4348b4568")
@@ -402,35 +400,8 @@ namespace nanosuit
             }
         }
     }   
-    public class NanoWaring : ModulePatch //来自山姆特警的第六感
-    {
-        private static float CoolTime;
-        protected override MethodBase GetTargetMethod()
-        {
-            var t = typeof(BotMemoryClass).GetProperty("GoalEnemy").PropertyType;
-            return t.GetMethod("SetVisible");
-        }
-        [PatchPostfix]
-        private static void PatchPostfix(object __instance, bool value, bool ___bool_0)
-        {
-            if (!NanoGUI.ready || Time.time < CoolTime) return;
-            var person = (IAIDetails)__instance.GetType().GetProperty("Person").GetValue(__instance);
-            if (!value || !person.GetPlayer.IsYourPlayer || !___bool_0) return;
-            //if (person.GetPlayer.IsYourPlayer) 
-            NanoGUI.befound = true;           
-            CoolTime = Time.time + 3f;
-        }
-    }
+    
     //[HarmonyPatch(typeof(Player), "MaxSpeed", MethodType.Getter)]
 
-    public class NanoSpeedPatch : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod() => typeof(GClass1604).GetMethod("MovementContext", BindingFlags.Instance | BindingFlags.Public);
-        [PatchPrefix]
-        public static bool Prefix(Player __instance, ref float MaxSpeed)
-        {
-            MaxSpeed = 1.8f;
-            return false; //拦截原方法，直接使用我们给出的结果
-        }
-    }
+
 }

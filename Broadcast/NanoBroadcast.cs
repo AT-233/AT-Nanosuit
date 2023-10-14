@@ -24,7 +24,7 @@ namespace nanosuit
         {
             if (nanosuitcore.BroadcastOnline.Value && isbroad)
             {
-                new NanoSystemPatch().Enable();
+                new NanoBroadSystemPatch().Enable();
                 voicechoose = 0;
                 killone = false;
                 isready = true;
@@ -33,7 +33,7 @@ namespace nanosuit
             }
             if (!nanosuitcore.BroadcastOnline.Value && !isbroad)
             {
-                new NanoSystemPatch().Disable();
+                new NanoBroadSystemPatch().Disable();
                 voicechoose = 0;
                 killone = false;
                 isready = true;
@@ -68,7 +68,7 @@ namespace nanosuit
             }
         }      
     }
-    public class NanoSystemPatch : ModulePatch
+    public class NanoBroadSystemPatch : ModulePatch
     {
         //搜索EFT空间下的Player类里的OnBeenKilledByAggressor
         protected override MethodBase GetTargetMethod()

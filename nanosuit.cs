@@ -6,6 +6,7 @@ using BepInEx;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 using EFT;
+using EFT.HealthSystem;
 using HarmonyLib;
 using UnityEngine;
 using EFT.Interactive;
@@ -18,7 +19,7 @@ using UnityEngine.UI;
 
 namespace nanosuit
 {
-    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "2.0.0.0")]
+    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "2.0.3.0")]
     public class nanosuitcore : BaseUnityPlugin
     {
         // 窗口开关
@@ -46,6 +47,7 @@ namespace nanosuit
         public static ConfigEntry<bool> Lockradar;
         public static ConfigEntry<string> nanoup;
         public static ConfigEntry<string> nanovoice;
+        public static ConfigEntry<string> nanoui;
         //public static ConfigEntry<string> language;
         public static ConfigEntry<KeyCode> ARMOR;
         public static ConfigEntry<KeyCode> STEALTH;
@@ -63,11 +65,12 @@ namespace nanosuit
         public static ConfigEntry<float> Xzhouxuan;
         public static ConfigEntry<float> Yzhouxuan;
         public static ConfigEntry<float> Zzhouxuan;
-        //public static ConfigEntry<float> ArmorhudScale;
         public static ConfigEntry<float> ArmorhudAlpha;
         public static ConfigEntry<float> FixIntensity;
+        public static ConfigEntry<float> Speednumber;
         public static string[] nanouplist = { "无(Null)", "生存强化(Enhanced Survival)", "自动装甲(Auto Armor)", "能量吸收(Energy absorption)" };
         public static string[] languagelist = { "二代男声(V2.0male)", "一代男声(V1.0male)", "一代女声(V1.0female)" };
+        public static string[] nanouilist = { "一代(V1.0)", "二代(V2.0)" };
         public static BindingFlags BFlags = BindingFlags.NonPublic
                                             | BindingFlags.Public
                                             | BindingFlags.Instance
@@ -97,6 +100,7 @@ namespace nanosuit
             quickgrenadecost = Config.Bind<int>("速度模式配置(Speed Settings)", "快速丢雷消耗(QuickGrenade Cost)", 3, "速度模式下丢雷一次消耗能量(Energy cost quick throw grenade in Speed mode)");
             speedcostrun = Config.Bind<float>("速度模式配置(Speed Settings)", "奔跑消耗(Running Cost)", 30, "速度模式下奔跑消耗的能量(Energy cost when running in Speed mode)");
             speedupbase = Config.Bind<float>("速度模式配置(Speed Settings)", "移动速度倍率(Moving Ratio)", 1.2f, "速度模式下移动速度倍率(Speed Ratio for moving in Speed mode)");
+            Speednumber = Config.Bind<float>("速度模式配置(Speed Settings)", "速度模式特殊参数(Speed Mode special parameter)", 0.02f, new ConfigDescription("速度模式下的移动遁地则调高本数值(Moves in speed mode increase this value if falling off the map)", new AcceptableValueRange<float>(0f, 0.1f)));
             nanocharg = Config.Bind<int>("充能配置(Charge Settings)", "充能速率(Charging Speed)", 25, "纳米服每秒充能速率(Nanosuit charge rate per second)");
             nanochargdelay = Config.Bind<int>("充能配置(Charge Settings)", "充能延迟(Charging Delay)", 2, "纳米服关闭功能后延迟几秒后开始充能(Turn off the function after a delay of a few seconds to start charging)");           
             nanoup = Config.Bind<string>("强化方案选择(Enhanced Choose)", "根据你的战斗习惯选择不同的强化方案(Depending on your combat habits, choose different Enhanced programs)", nanouplist[1], 
@@ -116,12 +120,14 @@ namespace nanosuit
             AmmoUIOnline = Config.Bind<bool>("纳米系统设置(Nanosystem Settings)", "弹药显示是否启动(Ammunition counter is online or not)", true, "开启后击杀AI播报语音(Turn on Ammunition counter)");
             nanovoice = Config.Bind<string>("纳米系统设置(Nanosystem Settings)", "选择你的纳米服语音音效(Select your nanosuit voice sound effect)", languagelist[0],
                 new ConfigDescription("选择你的纳米服语音音效(Select your nanosuit voice sound effect)", new AcceptableValueList<string>(languagelist)));
-            Xzhou = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条X轴位置(Energy HUD X-axis position)", -100f, new ConfigDescription("能量条在界面的左右位置(Energy HUD on the left and right positions of the interface)", new AcceptableValueRange<float>(-700, -100)));
+            nanoui = Config.Bind<string>("纳米系统设置(Nanosystem Settings)", "选择你的纳米服UI(Select your nanosuit UI)", nanouilist[0],
+                new ConfigDescription("选择你的纳米服UI(Select your nanosuit UI)", new AcceptableValueList<string>(nanouilist)));
+            Xzhou = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条X轴位置(Energy HUD X-axis position)", -115f, new ConfigDescription("能量条在界面的左右位置(Energy HUD on the left and right positions of the interface)", new AcceptableValueRange<float>(-700, -100)));
             Yzhou = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条Y轴位置(Energy HUD Y-axis position)", 30f, new ConfigDescription("能量条在界面的上下位置(Energy HUD on the upper and lower positions of the interface)", new AcceptableValueRange<float>(30, 400)));
-            Xzhouxuan = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条X轴旋转(Energy HUD X-axis rotation)", 20f, new ConfigDescription("能量条在界面的上下位置(Energy HUD spin back and forth of the interface)", new AcceptableValueRange<float>(-40, 40)));
-            Yzhouxuan = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条Y轴旋转(Energy HUD Y-axis rotation)", 30f, new ConfigDescription("能量条在界面的上下位置(Energy HUD spin left and right of the interface)", new AcceptableValueRange<float>(-50, 50)));
-            Zzhouxuan = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条Z轴旋转(Energy HUD Z-axis rotation)", -5f, new ConfigDescription("能量条在界面的上下位置(Energy HUD spin upper and lower of the interface)", new AcceptableValueRange<float>(-25, 25)));
-            curemodeOnline = Config.Bind<bool>("自动修复系统设置(Automatic Treatment System Settings)", "自动修复系统是否启动(Automatic treatment system online or not)", true, "你为什么还不死？选择生存强化后受伤10秒后修复全部黑色部位，去除所有负面效果，缓慢回复所有生命值(Why don't you die?After choosing Enhanced Survival,remove all negative states, repair black areas, and restore all health after 10 seconds of damage)");
+            Xzhouxuan = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条X轴旋转(Energy HUD X-axis rotation)", 25f, new ConfigDescription("能量条在界面的上下位置(Energy HUD spin back and forth of the interface)", new AcceptableValueRange<float>(-40, 40)));
+            Yzhouxuan = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条Y轴旋转(Energy HUD Y-axis rotation)", -10f, new ConfigDescription("能量条在界面的上下位置(Energy HUD spin left and right of the interface)", new AcceptableValueRange<float>(-50, 50)));
+            Zzhouxuan = Config.Bind("纳米系统设置(Nanosystem Settings)", "能量条Z轴旋转(Energy HUD Z-axis rotation)", -6f, new ConfigDescription("能量条在界面的上下位置(Energy HUD spin upper and lower of the interface)", new AcceptableValueRange<float>(-25, 25)));
+            curemodeOnline = Config.Bind<bool>("自动修复系统设置(Automatic Treatment System Settings)", "自动修复系统是否启动(Automatic treatment system online or not)", true, "选择生存强化后受伤10秒后修复全部黑色部位，去除所有负面效果，缓慢回复所有生命值(After choosing Enhanced Survival,remove all negative states, repair black areas, and restore all health after 10 seconds of damage)");
             FixIntensity = Config.Bind("自动修复系统设置(Automatic Treatment System Settings)", "修复速度(Treatment Rate)", 0.1f, new ConfigDescription("触发自动修复后的修复速率(Rate of Treatment after Automatic Treatment is triggered)", new AcceptableValueRange<float>(0f, 1f)));
             FixDelay = Config.Bind<int>("自动修复系统设置(Automatic Treatment System Settings)", "修复延迟(Treatment Delay)", 10, "收到伤害后延迟几秒后开始自动修复(After receiving damage delay of a few seconds, Automatic Treatment begins)");
         }
@@ -138,10 +144,10 @@ namespace nanosuit
 
         }
 
-        [HarmonyPatch(typeof(GClass2765), "HitCollider", MethodType.Getter)]
+        [HarmonyPatch(typeof(GClass2783), "HitCollider", MethodType.Getter)]
         public class NanosuitClockMode
         {
-            public static void Postfix(GClass2765 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2765
+            public static void Postfix(GClass2783 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2783
             {
                 var hitman = __instance.Player;//获取是谁射的子弹
                 if (__result != null)
@@ -153,7 +159,7 @@ namespace nanosuit
                     }
                 }
             }
-            
+
         }
     }
     public class nanosuit : MonoBehaviour
@@ -189,6 +195,7 @@ namespace nanosuit
         private int powervoice;
         private int speedvoice;
         private int nanomode;
+        private int nanouichoose;
         //private int flybasecost = 15;
         private GameObject clockbase;
         private GameObject nanoarmorhud;
@@ -197,7 +204,7 @@ namespace nanosuit
         //private GameObject nanoarmarmor;
         public static GameObject minimap;
         private GameObject flymode;
-        private GameObject marktarget;
+        public static GameObject marktarget;
         private GameObject fastmemu;
         private GameObject[] AItarget;      
         private float energytimer = 0;
@@ -242,7 +249,7 @@ namespace nanosuit
         public static Object stealthPrefab { get; private set; }
         public static Object armorhudPrefab { get; private set; }
         public static Object energyhudPrefab { get; private set; }
-        public static Object enenergyhudPrefab { get; private set; }
+        public static Object energyhudPrefab2 { get; private set; }
         public static Object nanovisionhudPrefab { get; private set; }
         public static Object flymodePrefab { get; private set; }
         public static Object nanotargetPrefab { get; private set; }
@@ -259,7 +266,8 @@ namespace nanosuit
             powervoice = 5;
             speedvoice = 9;
             energytimer = 0;
-            maxenergy = 100;           
+            maxenergy = 100;
+            nanouichoose = 0;
             isclick = false;
             isfly = false;
             isarmorfov = false;
@@ -300,7 +308,8 @@ namespace nanosuit
                 armorhudPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/HUD/ArmorHUD.prefab");
                 nanovisionhudPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/HUD/NanovisionHUD.prefab");
                 energyhudPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/GUI/NanoHUD.prefab");
-                enenergyhudPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/HUD/EnergyHUD(en).prefab");
+                energyhudPrefab2 = nanosuitBundle.LoadAsset("Assets/Nanosuit/GUI2.0/NanoHUD2.prefab");
+                //enenergyhudPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/HUD/EnergyHUD(en).prefab");
                 flymodePrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/flymode.prefab");
                 nanotargetPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/HUD/Nanotarget.prefab");
                 minimapPrefab = nanosuitBundle.LoadAsset("Assets/Nanosuit/Minimap/Mimiradar.prefab");
@@ -411,75 +420,45 @@ namespace nanosuit
                     new NanosuitPatch().Disable();//关闭受击buff     
                     isshengcun = false;
                 }
-                //if (nanosuitcore.nanoup.Value != "装甲强化(Enhanced Armor)")
-                //{
-                //    armorbasecost = nanosuitcore.armorcost.Value;
-                //}
-                //else
-                //{
-                //    CommonSet();
-                //    nanosuitcore.armorcost.Value = 1;
-                //    nanosuitcore.armordefenselow.Value = 1;
-                //    nanosuitcore.armordefensehigh.Value = 5;
-                //    armorbasecost = 1;
-                //    isshengcun = false;
-                //}
-                //if (nanosuitcore.nanoup.Value != "隐身强化(Enhanced Stealth)")
-                //{
-                //    stealthbasecost = nanosuitcore.stealthcost.Value;
-                //}
-                //else
-                //{
-                //    CommonSet();
-                //    nanosuitcore.stealthcost.Value = 3;
-                //    stealthbasecost = 3;
-                //    isshengcun = false;
-                //}
-                //if (nanosuitcore.nanoup.Value != "充能强化(Enhanced Charge)")
-                //{
-                //    nanochargbase = nanosuitcore.nanocharg.Value;
-                //    nanodelaychargbase = nanosuitcore.nanochargdelay.Value;
-                //}
-                //else
-                //{
-                //    CommonSet();
-                //    nanosuitcore.nanocharg.Value = 50;
-                //    nanosuitcore.nanochargdelay.Value = 1;
-                //    nanodelaychargbase = 1;
-                //    nanochargbase = 50;
-                //    isshengcun = false;
-                //}
-                //if (nanosuitcore.nanoup.Value != "推进器强化(Enhanced Propeller)")
-                //{
-                //    flybasecost = nanosuitcore.flycost.Value;
-                //}
-                //else
-                //{
-                //    CommonSet();
-                //    nanosuitcore.flycost.Value = 5;
-                //    flybasecost = 5;
-                //    isshengcun = false;
-                //}
-                //if (nanosuitcore.nanoup.Value != "纳米视野强化(Enhanced Nanovision)")
-                //{
-                //    nanovisionbasecost = nanosuitcore.nanovisioncost.Value;
-                //}
-                //else
-                //{
-                //    CommonSet();
-                //    nanosuitcore.nanovisioncost.Value = 2;
-                //    nanovisionbasecost = 2;
-                //    isshengcun = false;
-                //}
                 if (marktarget == null)
                 {
                     marktarget = GameObject.Find("FPS Camera");//找到第一人称视角摄像机
                 }
-                if (nanoenergyhud == null)//生成能量条HUD
+                if (nanosuitcore.nanoui.Value == "一代(V1.0)")
                 {
-                    var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
-                    nanoenergyhud = nanoenergyhudbase as GameObject;
-                    nanoenergyhud.transform.parent = marktarget.transform;
+                    if (nanoenergyhud == null && nanouichoose==0)
+                    {
+                        var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                        nanoenergyhud = nanoenergyhudbase as GameObject;
+                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanouichoose = 1;
+                    }
+                    if (nanoenergyhud != null && nanouichoose == 2)
+                    {
+                        Destroy(nanoenergyhud);
+                        var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
+                        nanoenergyhud = nanoenergyhudbase as GameObject;
+                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanouichoose = 1;
+                    }
+                }
+                if (nanosuitcore.nanoui.Value == "二代(V2.0)")
+                {
+                    if (nanoenergyhud == null && nanouichoose == 0)
+                    {
+                        var nanoenergyhudbase2 = Instantiate(energyhudPrefab2, marktarget.transform.position, marktarget.transform.rotation);
+                        nanoenergyhud = nanoenergyhudbase2 as GameObject;
+                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanouichoose = 2;
+                    }
+                    if (nanoenergyhud != null && nanouichoose == 1)
+                    {
+                        Destroy(nanoenergyhud);
+                        var nanoenergyhudbase2 = Instantiate(energyhudPrefab2, marktarget.transform.position, marktarget.transform.rotation);
+                        nanoenergyhud = nanoenergyhudbase2 as GameObject;
+                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanouichoose = 2;
+                    }
                 }
                 if (ischarging)//开始充能
                 {
@@ -695,7 +674,6 @@ namespace nanosuit
                     if (isnanovision)//判断现在是否纳米视野
                     {
                         Nanovoiceset(4);
-                        //this.GetComponent<AudioSource>().clip = audios[4];
                         this.GetComponent<AudioSource>().Play();
                         Destorynanohud();
                         if (nanovisionhud == null)
@@ -721,6 +699,80 @@ namespace nanosuit
                                 //Console.WriteLine("读取坐标" + gameWorld.AllAlivePlayersList[i].Transform.position);
                                 //Console.WriteLine(i);
                                 AItarget[i] = Instantiate(nanotargetPrefab, gameWorld.AllAlivePlayersList[i].Transform.position, gameWorld.AllAlivePlayersList[i].Transform.rotation) as GameObject;
+                                AItarget[i].transform.position = gameWorld.AllAlivePlayersList[i].Transform.position;
+                                if(gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.assault |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.marksman |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerBully |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerKojaniy |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerGluharAssault |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerGluharSecurity |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerGluharScout |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerGluharSnipe |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerSanitar |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.assaultGroup |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerTagilla |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.gifter |
+                                   gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.followerZryachiy)
+                                {
+                                    Image[] AItargetImagegroup = AItarget[i].GetComponentsInChildren<Image>();
+                                    foreach (Image child in AItargetImagegroup)
+                                    {
+                                        AItargetImagegroup[0].color = Color.yellow;
+                                        AItargetImagegroup[1].color = Color.yellow;
+                                        AItargetImagegroup[2].color = Color.yellow;
+                                    }
+                                }
+                                if (gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.bossBully|
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossKilla |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossKilla |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossKojaniy |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossGluhar |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossSanitar |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossTagilla |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossKnight |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossZryachiy |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerBirdEye |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerBigPipe)
+                                {
+                                    Image[] AItargetImagegroup = AItarget[i].GetComponentsInChildren<Image>();
+                                    foreach (Image child in AItargetImagegroup)
+                                    {
+                                        AItargetImagegroup[0].color = Color.red;
+                                        AItargetImagegroup[1].color = Color.red;
+                                        AItargetImagegroup[2].color = Color.red;
+                                    }
+                                }
+                                if (gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.pmcBot)
+                                {
+                                    Image[] AItargetImagegroup = AItarget[i].GetComponentsInChildren<Image>();
+                                    foreach (Image child in AItargetImagegroup)
+                                    {
+                                        AItargetImagegroup[0].color = Color.blue;
+                                        AItargetImagegroup[1].color = Color.blue;
+                                        AItargetImagegroup[2].color = Color.blue;
+                                    }
+                                }
+                                if (gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.exUsec)
+                                {
+                                    Image[] AItargetImagegroup = AItarget[i].GetComponentsInChildren<Image>();
+                                    foreach (Image child in AItargetImagegroup)
+                                    {
+                                        AItargetImagegroup[0].color = Color.black;
+                                        AItargetImagegroup[1].color = Color.black;
+                                        AItargetImagegroup[2].color = Color.black;
+                                    }
+                                }
+                                if (gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.sectantWarrior|
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.sectantPriest)
+                                {
+                                    Image[] AItargetImagegroup = AItarget[i].GetComponentsInChildren<Image>();
+                                    foreach (Image child in AItargetImagegroup)
+                                    {
+                                        AItargetImagegroup[0].color = Color.white;
+                                        AItargetImagegroup[1].color = Color.white;
+                                        AItargetImagegroup[2].color = Color.white;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1097,14 +1149,38 @@ namespace nanosuit
                         maxenergy = 0;
                         energytimer = 0;
                         isenergyempty = true;
-                    }                                    
+                    }
+                    //if (!isenergyempty)
+                    //{
+                    //    if (gameWorld.AllAlivePlayersList.Count >= 2)
+                    //    {
+                    //        for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
+                    //        {
+                    //            AIhealth[i] = gameWorld.AllAlivePlayersList[i].HealthController.IsAlive;
+                    //            if (!AIhealth[i])
+                    //            {
+                    //                Destroy(AItarget[i]);
+                    //            }
+                    //        }
+                    //    }
+                    //    if (gameWorld.AllAlivePlayersList.Count == 1)
+                    //    {
+                    //        for (int i = 1; i < 10; i++)
+                    //        {
+                    //            if (AItarget[i] != null)
+                    //            {
+                    //                Destroy(AItarget[i]);
+                    //            }
+                    //        }
+                    //    }
+                    //}
                     if (!isenergyempty)
                     {
                         if (gameWorld.AllAlivePlayersList.Count >= 2)
                         {
                             for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
                             {
-                                AIhealth[i] = gameWorld.AllAlivePlayersList[i].HealthController.IsAlive;
+                                AIhealth[i] = gameWorld.AllAlivePlayersList[i].ActiveHealthController.IsAlive;
                                 if (!AIhealth[i])
                                 {
                                     Destroy(AItarget[i]);
@@ -1486,23 +1562,23 @@ namespace nanosuit
         [PatchPostfix]
         static void PostFix(ref Player __instance, EDamageType type)
         {
-            if (__instance.IsYourPlayer && (type == EDamageType.Bullet || type == EDamageType.Explosion || type == EDamageType.Sniper || type == EDamageType.Landmine || type == EDamageType.GrenadeFragment || type == EDamageType.Barbed || type == EDamageType.Fall))
-            {                
+            if (__instance.IsYourPlayer )
+            {
                 if (!nanosuit.isarmor)
                 {
                     nanosuit.fixdelaytime = 0;
                     nanosuit.startfixdebuff = true;
                     nanosuit.iscureyourself = false;
-                } //350是2091；351-353是2100；355-356是2103，357是2102，360是2327，370是2227
-                if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "PainKiller"))
-                {
-                    HealthControllerClass.GClass2227 nanoPainKiller = typeof(HealthControllerClass).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(HealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as HealthControllerClass.GClass2227;
-                    if (nanoPainKiller.TimeLeft < 60) nanoPainKiller.AddWholeTime(60f);
-                    return;
-                }
+                } //350是2091；351-353是2100；355-356是2103，357是2102，360是2327和ActiveHealthControllerClass，370是2233和ActiveHealthController
+                //if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "PainKiller"))
+                //{
+                //    ActiveHealthController.GClass2233 nanoPainKiller = typeof(ActiveHealthController).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthController).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthController.GClass2233;
+                //    if (nanoPainKiller.TimeLeft < 60) nanoPainKiller.AddWholeTime(60f);
+                //    return;
+                //}
 
-                MethodInfo method = typeof(HealthControllerClass).GetMethod("method_15", BindingFlags.Instance | BindingFlags.NonPublic);
-                method.MakeGenericMethod(typeof(HealthControllerClass).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, 0f, 60f, 0f, 1f, null });               
+                //MethodInfo method = typeof(ActiveHealthController).GetMethod("AddEffect", BindingFlags.Instance | BindingFlags.NonPublic);
+                //method.MakeGenericMethod(typeof(ActiveHealthController).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head, 0f, 60f, 0f, 1f, null });
             }
         }
     }
@@ -1565,10 +1641,30 @@ namespace nanosuit
         [PatchPrefix]
         static void Prefix(object __instance, ref float speed)
         {
-            if (__instance!=null && NanoGUI.isweapon && nanosuit.isspeed)
+            if (__instance!=null && (NanoGUI.isweapon|| NanoGUI2.isweapon) && nanosuit.isspeed)
             {
                 speed *= nanosuitcore.speedratio.Value;
             }
+        }
+    }
+    public class NanoWaring : ModulePatch //来自山姆特警的第六感
+    {
+        private static float CoolTime;
+        protected override MethodBase GetTargetMethod()
+        {
+            var t = typeof(BotMemoryClass).GetProperty("GoalEnemy").PropertyType;
+            return t.GetMethod("SetVisible");
+        }
+        [PatchPostfix]
+        private static void PatchPostfix(object __instance, bool value, bool ____canShoot)
+        {
+            if (!NanoGUI.ready || Time.time < CoolTime) return;
+            var person = (IPlayer)__instance.GetType().GetProperty("Person").GetValue(__instance);
+            if (!value || !person.IsYourPlayer || !____canShoot) return;
+            //if (person.GetPlayer.IsYourPlayer) 
+            NanoGUI.befound = true;
+            NanoGUI2.befound2 = true;
+            CoolTime = Time.time + 3f;
         }
     }
     public class speedupcore : ModulePatch
@@ -1602,7 +1698,7 @@ namespace nanosuit
                 if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D)) && nanosuit.isspeed)
                 {
                     var tmp_x = speedupcore._motion.x * nanosuitcore.speedupbase.Value;
-                    var tmp_y = 0.02f;
+                    var tmp_y = nanosuitcore.Speednumber.Value;
                     var tmp_z = speedupcore._motion.z * nanosuitcore.speedupbase.Value;
                     __result = point + new Vector3(tmp_x, tmp_y, tmp_z);
                     return false;
