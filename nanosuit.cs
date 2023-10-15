@@ -144,10 +144,10 @@ namespace nanosuit
 
         }
 
-        [HarmonyPatch(typeof(GClass2783), "HitCollider", MethodType.Getter)]
+        [HarmonyPatch(typeof(GClass2784), "HitCollider", MethodType.Getter)]
         public class NanosuitClockMode
         {
-            public static void Postfix(GClass2783 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2783
+            public static void Postfix(GClass2784 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2783，371是2784
             {
                 var hitman = __instance.Player;//获取是谁射的子弹
                 if (__result != null)
@@ -1572,7 +1572,7 @@ namespace nanosuit
                 } //350是2091；351-353是2100；355-356是2103，357是2102，360是2327和ActiveHealthControllerClass，370是2233和ActiveHealthController
                 //if (__instance.ActiveHealthController.BodyPartEffects.Effects[0].Any(v => v.Key == "PainKiller"))
                 //{
-                //    ActiveHealthController.GClass2233 nanoPainKiller = typeof(ActiveHealthController).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthController).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthController.GClass2233;
+                //    ActiveHealthController.GClass2234 nanoPainKiller = typeof(ActiveHealthController).GetMethod("FindActiveEffect", BindingFlags.Instance | BindingFlags.Public).MakeGenericMethod(typeof(ActiveHealthController).GetNestedType("PainKiller", BindingFlags.Instance | BindingFlags.NonPublic)).Invoke(__instance.ActiveHealthController, new object[] { EBodyPart.Head }) as ActiveHealthController.GClass2234;
                 //    if (nanoPainKiller.TimeLeft < 60) nanoPainKiller.AddWholeTime(60f);
                 //    return;
                 //}
