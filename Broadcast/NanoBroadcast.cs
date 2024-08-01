@@ -1,5 +1,5 @@
 using System.Reflection;
-using Aki.Reflection.Patching;
+using SPT.Reflection.Patching;
 using EFT;
 using UnityEngine;
 
@@ -73,7 +73,7 @@ namespace nanosuit
         //搜索EFT空间下的Player类里的OnBeenKilledByAggressor
         protected override MethodBase GetTargetMethod()
         {
-            return typeof(Player).GetMethod("OnBeenKilledByAggressor", BindingFlags.Instance | BindingFlags.NonPublic);
+            return typeof(Player).GetMethod("OnBeenKilledByAggressor", nanosuitcore.BFlags);
         }
         [PatchPostfix]
         private static void PatchPostFix(ref Player __instance, Player aggressor)

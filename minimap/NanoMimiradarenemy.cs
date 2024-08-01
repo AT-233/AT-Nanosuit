@@ -52,7 +52,6 @@ namespace nanosuit
             if (findenemy && dis < 100)
             {
                 findenemy = false;
-
             }
             if (!findenemy)
             {
@@ -86,10 +85,12 @@ namespace nanosuit
             float maxX = Screen.width - minX;
             float minY = target.GetPixelAdjustedRect().height / 2;
             float maxY = Screen.height - minY;
-            target.GetComponent<RectTransform>().localScale = new Vector3(3.3f - (dismax / 100)*3, 3.3f - (dismax / 100) * 3, 1);
-            targetlow.GetComponent<RectTransform>().localScale = new Vector3(3.3f - (dismax / 100) * 3, 3.3f - (dismax / 100) * 3, 1);
-            targetup.GetComponent<RectTransform>().localScale = new Vector3(3.3f - (dismax / 100) * 3, 3.3f - (dismax / 100) * 3, 1);
+            target.GetComponent<RectTransform>().localScale = new Vector3(1.3f - (dismax / 100)*1, 1.3f - (dismax / 100) * 1, 1);
+            targetlow.GetComponent<RectTransform>().localScale = new Vector3(1.3f - (dismax / 100) * 1, 1.3f - (dismax / 100) * 1, 1);
+            targetup.GetComponent<RectTransform>().localScale = new Vector3(1.3f - (dismax / 100) *1, 1.3f - (dismax / 100) *1, 1);
             pos = Camera.main.WorldToScreenPoint(targettransform.position);
+            //pos.x = Camera.main.WorldToScreenPoint(targettransform.position).x * Screen.width / Camera.main.pixelWidth;
+            //pos.y = Camera.main.WorldToScreenPoint(targettransform.position).y * Screen.height / Camera.main.pixelHeight;
             if (Vector3.Dot((targettransform.position - nanosuit.marktarget.transform.position), nanosuit.marktarget.transform.forward) < 0)
             {
                 if (pos.x < Screen.width / 2)

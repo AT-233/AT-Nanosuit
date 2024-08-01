@@ -31,16 +31,16 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="%28370%29Assembly-CSharp">
-      <HintPath>..\(370)Assembly-CSharp.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
     <Reference Include="0Harmony">
       <HintPath>..\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Aki.Reflection">
       <HintPath>..\Aki.Reflection.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>..\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="BepInEx">
@@ -57,6 +57,10 @@
     </Reference>
     <Reference Include="ConfigurationManager">
       <HintPath>..\ConfigurationManager.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="spt-reflection">
+      <HintPath>..\..\GAMES\Client.0.14.9.1.30626\BepInEx\plugins\spt\spt-reflection.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />

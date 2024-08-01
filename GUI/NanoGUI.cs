@@ -1,4 +1,4 @@
-﻿using Aki.Reflection.Patching;
+﻿using SPT.Reflection.Patching;
 using Comfort.Common;
 using EFT;
 using EFT.HealthSystem;
@@ -55,7 +55,7 @@ namespace nanosuit
         private float timeFade;
         private float jumpFade;
         private Weapon NowWeapon;
-        private static Player NanoPlayer;
+        private static Player NanoPlayer;       
         private Player.FirearmController NowFirearmController;
         private Item NowItemController;
         // Start is called before the first frame update

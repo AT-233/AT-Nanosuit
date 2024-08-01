@@ -10,7 +10,7 @@ using EFT.HealthSystem;
 using HarmonyLib;
 using UnityEngine;
 using EFT.Interactive;
-using Aki.Reflection.Patching;
+using SPT.Reflection.Patching;
 using Object = UnityEngine.Object;
 using Comfort.Common;
 using System.Collections;
@@ -19,7 +19,7 @@ using UnityEngine.UI;
 
 namespace nanosuit
 {
-    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "2.0.3.0")]
+    [BepInPlugin("AT.nanosuit", "AT.纳米生化装Nanosuit", "2.0.4.0")]
     public class nanosuitcore : BaseUnityPlugin
     {
         // 窗口开关
@@ -99,8 +99,8 @@ namespace nanosuit
             speedratio = Config.Bind<float>("速度模式配置(Speed Settings)", "武器使用速度倍率(Weapon use speed Ratio)", 1.8f, "速度模式下武器使用速度倍率(Speed Ratio for weapon use in Speed mode)");
             quickgrenadecost = Config.Bind<int>("速度模式配置(Speed Settings)", "快速丢雷消耗(QuickGrenade Cost)", 3, "速度模式下丢雷一次消耗能量(Energy cost quick throw grenade in Speed mode)");
             speedcostrun = Config.Bind<float>("速度模式配置(Speed Settings)", "奔跑消耗(Running Cost)", 30, "速度模式下奔跑消耗的能量(Energy cost when running in Speed mode)");
-            speedupbase = Config.Bind<float>("速度模式配置(Speed Settings)", "移动速度倍率(Moving Ratio)", 1.2f, "速度模式下移动速度倍率(Speed Ratio for moving in Speed mode)");
-            Speednumber = Config.Bind<float>("速度模式配置(Speed Settings)", "速度模式特殊参数(Speed Mode special parameter)", 0.02f, new ConfigDescription("速度模式下的移动遁地则调高本数值(Moves in speed mode increase this value if falling off the map)", new AcceptableValueRange<float>(0f, 0.1f)));
+            speedupbase = Config.Bind<float>("速度模式配置(Speed Settings)", "移动速度倍率(Moving Ratio)", 1f, "速度模式下移动速度倍率(Speed Ratio for moving in Speed mode)");
+            //Speednumber = Config.Bind<float>("速度模式配置(Speed Settings)", "速度模式特殊参数(Speed Mode special parameter)", 0.02f, new ConfigDescription("速度模式下的移动遁地则调高本数值(Moves in speed mode increase this value if falling off the map)", new AcceptableValueRange<float>(0f, 0.1f)));
             nanocharg = Config.Bind<int>("充能配置(Charge Settings)", "充能速率(Charging Speed)", 25, "纳米服每秒充能速率(Nanosuit charge rate per second)");
             nanochargdelay = Config.Bind<int>("充能配置(Charge Settings)", "充能延迟(Charging Delay)", 2, "纳米服关闭功能后延迟几秒后开始充能(Turn off the function after a delay of a few seconds to start charging)");           
             nanoup = Config.Bind<string>("强化方案选择(Enhanced Choose)", "根据你的战斗习惯选择不同的强化方案(Depending on your combat habits, choose different Enhanced programs)", nanouplist[1], 
@@ -144,10 +144,10 @@ namespace nanosuit
 
         }
 
-        [HarmonyPatch(typeof(GClass2784), "HitCollider", MethodType.Getter)]
+        [HarmonyPatch(typeof(EftBulletClass), "HitCollider", MethodType.Getter)]
         public class NanosuitClockMode
         {
-            public static void Postfix(GClass2784 __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2783，371是2784
+            public static void Postfix(EftBulletClass __instance, ref Collider __result)//350是2611,351-353是2620, 355-356是2623，357是2624，360是2870，370是2783，371是2784，380是2992
             {
                 var hitman = __instance.Player;//获取是谁射的子弹
                 if (__result != null)
@@ -239,6 +239,9 @@ namespace nanosuit
         private bool isfirstlowpower = false;
         private bool isarmorfov = false;
         private bool[] AIhealth;
+        private static Player NanoPlayer;
+        private static SimpleCharacterController NanoPlayermove;
+        public static Vector3 NanoPlayerslide;
         public enum Clickcount
         {
             firsttime,
@@ -285,9 +288,9 @@ namespace nanosuit
             new FastWeapon().Enable();
             new BoyNextDoor().Enable();
             new FastGrenade().Enable();
-            new speedupcore().Enable();
-            new speedmode().Enable();
-            new speeduplink().Enable();
+            //new speedupcore().Enable();
+            //new speedmode().Enable();
+            //new speeduplink().Enable();
             newmaterial = new Material[Hand.GetComponent<SkinnedMeshRenderer>().materials.Length];//替换材质只能这样搞
             for (int i = 0; i < newmaterial.Length; i++)//获取物体全部材质
             {
@@ -423,6 +426,9 @@ namespace nanosuit
                 if (marktarget == null)
                 {
                     marktarget = GameObject.Find("FPS Camera");//找到第一人称视角摄像机
+                    NanoPlayer = gameWorld.MainPlayer;
+                    NanoPlayerslide = NanoPlayer.Transform.forward;
+                    NanoPlayermove = NanoPlayer.gameObject.GetComponent<SimpleCharacterController>();
                 }
                 if (nanosuitcore.nanoui.Value == "一代(V1.0)")
                 {
@@ -430,7 +436,7 @@ namespace nanosuit
                     {
                         var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
                         nanoenergyhud = nanoenergyhudbase as GameObject;
-                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanoenergyhud.transform.parent = NanoPlayer.gameObject.transform;
                         nanouichoose = 1;
                     }
                     if (nanoenergyhud != null && nanouichoose == 2)
@@ -438,7 +444,7 @@ namespace nanosuit
                         Destroy(nanoenergyhud);
                         var nanoenergyhudbase = Instantiate(energyhudPrefab, marktarget.transform.position, marktarget.transform.rotation);
                         nanoenergyhud = nanoenergyhudbase as GameObject;
-                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanoenergyhud.transform.parent = NanoPlayer.gameObject.transform;
                         nanouichoose = 1;
                     }
                 }
@@ -448,7 +454,7 @@ namespace nanosuit
                     {
                         var nanoenergyhudbase2 = Instantiate(energyhudPrefab2, marktarget.transform.position, marktarget.transform.rotation);
                         nanoenergyhud = nanoenergyhudbase2 as GameObject;
-                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanoenergyhud.transform.parent = NanoPlayer.gameObject.transform;
                         nanouichoose = 2;
                     }
                     if (nanoenergyhud != null && nanouichoose == 1)
@@ -456,7 +462,7 @@ namespace nanosuit
                         Destroy(nanoenergyhud);
                         var nanoenergyhudbase2 = Instantiate(energyhudPrefab2, marktarget.transform.position, marktarget.transform.rotation);
                         nanoenergyhud = nanoenergyhudbase2 as GameObject;
-                        nanoenergyhud.transform.parent = marktarget.transform;
+                        nanoenergyhud.transform.parent = NanoPlayer.gameObject.transform;
                         nanouichoose = 2;
                     }
                 }
@@ -732,7 +738,8 @@ namespace nanosuit
                                     gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossKnight |
                                     gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.bossZryachiy |
                                     gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerBirdEye |
-                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerBigPipe)
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role ==  WildSpawnType.followerBigPipe |
+                                    gameWorld.AllAlivePlayersList[i].Profile.Info.Settings.Role == WildSpawnType.bossBoar)
                                 {
                                     Image[] AItargetImagegroup = AItarget[i].GetComponentsInChildren<Image>();
                                     foreach (Image child in AItargetImagegroup)
@@ -1110,17 +1117,10 @@ namespace nanosuit
                     ischarging = false;
                     maxenergy -= Time.deltaTime * nanosuitcore.speedcost.Value;
                     MoveSpeedUp();
-                    //if (speedupbase != 1.2f)
-                    //{
-                    //    speedupbase = 1.2f;
-                    //}
+                    SpeedUpcore();
                     if (gameWorld.MainPlayer.IsSprintEnabled)
                     {
                         maxenergy -= Time.deltaTime * nanosuitcore.speedcostrun.Value;
-                        //if(speedupbase!=2f)
-                        //{
-                        //    speedupbase = 2;
-                        //}
                     }
                     if (maxenergy <= 0)
                     {
@@ -1150,30 +1150,6 @@ namespace nanosuit
                         energytimer = 0;
                         isenergyempty = true;
                     }
-                    //if (!isenergyempty)
-                    //{
-                    //    if (gameWorld.AllAlivePlayersList.Count >= 2)
-                    //    {
-                    //        for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
-                    //        {
-                    //            AIhealth[i] = gameWorld.AllAlivePlayersList[i].HealthController.IsAlive;
-                    //            if (!AIhealth[i])
-                    //            {
-                    //                Destroy(AItarget[i]);
-                    //            }
-                    //        }
-                    //    }
-                    //    if (gameWorld.AllAlivePlayersList.Count == 1)
-                    //    {
-                    //        for (int i = 1; i < 10; i++)
-                    //        {
-                    //            if (AItarget[i] != null)
-                    //            {
-                    //                Destroy(AItarget[i]);
-                    //            }
-                    //        }
-                    //    }
-                    //}
                     if (!isenergyempty)
                     {
                         if (gameWorld.AllAlivePlayersList.Count >= 2)
@@ -1270,7 +1246,7 @@ namespace nanosuit
                 {
                     for (int i = 1; i < gameWorld.AllAlivePlayersList.Count; i++)//获取全部AI
                     {
-                        gameWorld.AllAlivePlayersList[i].KillMe(EBodyPart.Head, 1000f); 
+                        gameWorld.AllAlivePlayersList[i].KillMe(EBodyPartColliderType.HeadCommon, 1000f);
                     }
                 }
             }           
@@ -1281,7 +1257,6 @@ namespace nanosuit
             {
                 Console.WriteLine(gameWorld.MainPlayer.IsSprintEnabled);
             }
-
         }
         private void FastMemu()
         {
@@ -1344,14 +1319,14 @@ namespace nanosuit
         }
         private void Powermode()
         {
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity != nanosuitcore.powerweapon.Value)
-            {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity = nanosuitcore.powerweapon.Value;
-            }
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness != nanosuitcore.powerweapon.Value)
-            {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness = nanosuitcore.powerweapon.Value;
-            }
+            //if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity != nanosuitcore.powerweapon.Value)
+            //{
+            //    gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity. = nanosuitcore.powerweapon.Value;
+            //}
+            //if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness != nanosuitcore.powerweapon.Value)
+            //{
+            //    gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness = nanosuitcore.powerweapon.Value;
+            //}
             if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity != nanosuitcore.powerweapon.Value)
             {
                 gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity = nanosuitcore.powerweapon.Value;
@@ -1367,14 +1342,14 @@ namespace nanosuit
         }
         private void Powermodeclose()
         {
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity != 1f)
-            {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity = 1f;
-            }
-            if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness != 1f)
-            {
-                gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness = 1f;
-            }
+            //if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity != 1f)
+            //{
+            //    gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Intensity = 1f;
+            //}
+            //if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness != 1f)
+            //{
+            //    gameWorld.MainPlayer.ProceduralWeaponAnimation.Shootingg.Stiffness = 1f;
+            //}
             if (gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity != 1f)
             {
                 gameWorld.MainPlayer.ProceduralWeaponAnimation.Breath.Intensity = 1f;
@@ -1423,6 +1398,76 @@ namespace nanosuit
             if (gameWorld.MainPlayer.Skills.AttentionEliteLuckySearch.Value != 0.2f)
             {
                 gameWorld.MainPlayer.Skills.AttentionEliteLuckySearch.Value = 0.2f;
+            }
+        }
+        private void SpeedUpcore()
+        {
+            if (Input.GetKey(KeyCode.W) && NanoPlayer.IsSprintEnabled)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value);
+            }
+            if (Input.GetKey(KeyCode.A) && NanoPlayer.IsSprintEnabled)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value);
+            }
+            if (Input.GetKey(KeyCode.S) && NanoPlayer.IsSprintEnabled)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value);
+            }
+            if (Input.GetKey(KeyCode.D) && NanoPlayer.IsSprintEnabled)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value);
+            }
+
+            if (Input.GetKey(KeyCode.W) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.5F);
+            }
+            if (Input.GetKey(KeyCode.A) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.5F);
+            }
+            if (Input.GetKey(KeyCode.S) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.5F);
+            }
+            if (Input.GetKey(KeyCode.D) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.5F);
+            }
+
+            if (Input.GetKey(KeyCode.W) && NanoPlayer.Pose == EPlayerPose.Duck && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+            if (Input.GetKey(KeyCode.A) && NanoPlayer.Pose == EPlayerPose.Duck && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+            if (Input.GetKey(KeyCode.S) && NanoPlayer.Pose == EPlayerPose.Duck && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+            if (Input.GetKey(KeyCode.D) && NanoPlayer.Pose == EPlayerPose.Duck && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Run)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+
+            if (Input.GetKey(KeyCode.W) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Jump)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+            if (Input.GetKey(KeyCode.A) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Jump)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+            if (Input.GetKey(KeyCode.S) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Jump)
+            {
+                NanoPlayermove.Move(-NanoPlayer.Transform.forward, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
+            }
+            if (Input.GetKey(KeyCode.D) && NanoPlayer.Pose == EPlayerPose.Stand && NanoPlayer.MovementContext.CurrentState.Name == EPlayerState.Jump)
+            {
+                NanoPlayermove.Move(NanoPlayer.Transform.right, Time.deltaTime * nanosuitcore.speedupbase.Value * 0.25F);
             }
         }
         void LateUpdate()
@@ -1698,9 +1743,9 @@ namespace nanosuit
                 if ((Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.D)) && nanosuit.isspeed)
                 {
                     var tmp_x = speedupcore._motion.x * nanosuitcore.speedupbase.Value;
-                    var tmp_y = nanosuitcore.Speednumber.Value;
+                    //var tmp_y = nanosuitcore.Speednumber.Value;
                     var tmp_z = speedupcore._motion.z * nanosuitcore.speedupbase.Value;
-                    __result = point + new Vector3(tmp_x, tmp_y, tmp_z);
+                    __result = point + new Vector3(tmp_x, speedupcore._motion.y, tmp_z);
                     return false;
                 }
             }

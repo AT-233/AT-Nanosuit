@@ -4,3 +4,9 @@ E:\塔科夫自制皮肤\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.cspro
 E:\塔科夫自制皮肤\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.csproj.CoreCompileInputs.cache
 E:\塔科夫自制皮肤\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.dll
 E:\塔科夫自制皮肤\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.pdb
+D:\编程大法好\AT.nanosuit\bin\Debug\AT.nanosuit.dll
+D:\编程大法好\AT.nanosuit\bin\Debug\AT.nanosuit.pdb
+D:\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.csproj.AssemblyReference.cache
+D:\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.csproj.CoreCompileInputs.cache
+D:\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.dll
+D:\编程大法好\AT.nanosuit\obj\Debug\AT.nanosuit.pdb
